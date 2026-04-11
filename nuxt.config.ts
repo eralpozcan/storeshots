@@ -4,6 +4,9 @@ export default defineNuxtConfig({
   devServer: { port: 3005 },
   compatibilityDate: '2025-01-01',
   future: { compatibilityVersion: 4 },
+  nitro: {
+    preset: 'netlify',
+  },
   components: [
     { path: '~/components', pathPrefix: false },
   ],
