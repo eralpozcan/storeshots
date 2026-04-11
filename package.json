@@ -1,0 +1,47 @@
+{
+  "name": "storeshots",
+  "private": false,
+  "description": "Generate professional App Store & Google Play screenshots with AI-powered copywriting, device mockups, and smart slide ordering",
+  "author": "Eralp Ozcan",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eralpozcan/storeshots.git"
+  },
+  "keywords": [
+    "app-store",
+    "google-play",
+    "screenshots",
+    "mockup",
+    "ai",
+    "nuxt",
+    "vue",
+    "openrouter",
+    "claude",
+    "aso"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview"
+  },
+  "dependencies": {
+    "@nuxt/fonts": "^0.14.0",
+    "@nuxt/ui": "^4.3.0",
+    "html-to-image": "^1.11.13",
+    "nuxt": "^4.2.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.8.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "esbuild",
+      "vue-demi"
+    ]
+  }
+}
