@@ -237,7 +237,9 @@ Built upon the concepts from [ParthJadhav/app-store-screenshots](https://github.
 
 ## Contributing
 
-Contributions welcome! Areas of interest:
+Contributions welcome! Please read the **[Contributing Guide](CONTRIBUTING.md)** before submitting a PR.
+
+Areas of interest:
 
 - New slide templates and layouts
 - Additional device frames
@@ -249,4 +251,4 @@ Contributions welcome! Areas of interest:
 
 ## License
 
-MIT
+[MIT](LICENSE)
