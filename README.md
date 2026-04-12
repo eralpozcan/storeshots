@@ -4,7 +4,7 @@ Generate professional, production-ready screenshots for **Apple App Store** and 
 
 > **Built upon** the concepts from [ParthJadhav/app-store-screenshots](https://github.com/ParthJadhav/app-store-screenshots) — an AI skill for generating store screenshots via coding agents. Storeshots takes that foundation and turns it into a **standalone visual application** with real-time preview, multi-device support, AI vision analysis, and one-click export.
 
-[![Netlify Status](https://api.netlify.com/api/v1/badges/storeshots-org/deploy-status)](https://app.netlify.com/projects/storeshots-org/deploys)
+[![Netlify Status](https://api.netlify.com/api/v1/badges/dff75e51-1b94-45d2-b6f5-97f0149f5c80/deploy-status)](https://app.netlify.com/projects/storeshots/deploys)
 ![Beta](https://img.shields.io/badge/Status-Beta-orange)
 ![Nuxt 4](https://img.shields.io/badge/Nuxt-4-00DC82?logo=nuxt.js&logoColor=white)
 ![Vue 3](https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white)
