@@ -4,6 +4,13 @@ import type { Device, Orientation } from '~/utils/types'
 import { FGW, FGH } from '~/utils/canvas'
 import { SLIDE_COUNT_APPLE, SLIDE_COUNT_ANDROID } from '~/utils/defaults'
 
+useSeoMeta({
+  title: 'Storeshots — App Store & Google Play Screenshot Generator',
+  description: 'Generate professional App Store & Google Play screenshots with AI-powered copywriting, device mockups, and smart slide ordering. Free & open source.',
+  ogImage: '/logo.png',
+  twitterCard: 'summary_large_image',
+})
+
 const {
   config, device, orientation, sizeIdx, exporting, generating,
   ready, isTablet, canvasDims, slideConfig, sizePick,

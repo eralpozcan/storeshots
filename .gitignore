@@ -28,3 +28,4 @@ Thumbs.db
 # Lock files (keep pnpm-lock)
 package-lock.json
 yarn.lock
+.netlify/
