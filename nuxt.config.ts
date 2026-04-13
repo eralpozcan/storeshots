@@ -27,7 +27,12 @@ export default defineNuxtConfig({
     },
   },
   ogImage: {
-    enabled: true,
+    zeroRuntime: true,
+  },
+  vite: {
+    optimizeDeps: {
+      include: ['html-to-image'],
+    },
   },
   schemaOrg: {
     identity: {
