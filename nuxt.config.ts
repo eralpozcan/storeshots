@@ -24,6 +24,21 @@ export default defineNuxtConfig({
   app: {
     head: {
       title: 'Storeshots — App Store & Google Play Screenshot Generator',
+      meta: [
+        { name: 'description', content: 'Generate professional App Store & Google Play screenshots with AI-powered copywriting, device mockups, and smart slide ordering. Free & open source.' },
+        { property: 'og:title', content: 'Storeshots — App Store & Google Play Screenshot Generator' },
+        { property: 'og:description', content: 'Generate professional App Store & Google Play screenshots with AI-powered copywriting, device mockups, and smart slide ordering. Free & open source.' },
+        { property: 'og:image', content: 'https://storeshots.org/mockup.png' },
+        { property: 'og:image:width', content: '1200' },
+        { property: 'og:image:height', content: '630' },
+        { property: 'og:url', content: 'https://storeshots.org' },
+        { property: 'og:type', content: 'website' },
+        { property: 'og:site_name', content: 'Storeshots' },
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: 'Storeshots — App Store & Google Play Screenshot Generator' },
+        { name: 'twitter:description', content: 'Generate professional App Store & Google Play screenshots with AI-powered copywriting, device mockups, and smart slide ordering. Free & open source.' },
+        { name: 'twitter:image', content: 'https://storeshots.org/mockup.png' },
+      ],
       link: [
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
         { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16x16.png' },

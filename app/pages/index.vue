@@ -7,8 +7,11 @@ import { SLIDE_COUNT_APPLE, SLIDE_COUNT_ANDROID } from '~/utils/defaults'
 useSeoMeta({
   title: 'Storeshots — App Store & Google Play Screenshot Generator',
   description: 'Generate professional App Store & Google Play screenshots with AI-powered copywriting, device mockups, and smart slide ordering. Free & open source.',
-  ogImage: '/logo.png',
+  ogImage: 'https://storeshots.org/mockup.png',
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
   twitterCard: 'summary_large_image',
+  twitterImage: 'https://storeshots.org/mockup.png',
 })
 
 const {
