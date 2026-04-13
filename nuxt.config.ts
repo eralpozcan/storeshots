@@ -56,6 +56,7 @@ export default defineNuxtConfig({
         'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
         'connect-src': ["'self'", 'https://fonts.googleapis.com', 'https://fonts.gstatic.com'],
+        'worker-src': ["'self'", 'blob:'],
       },
       crossOriginEmbedderPolicy: false,
     },
