@@ -5,6 +5,7 @@ node_modules/
 .output/
 .nuxt/
 dist/
+node-compile-cache/
 
 # Environment
 .env
@@ -24,6 +25,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Nitro / dev server IPC sockets
+*.sock
 
 # Lock files (keep pnpm-lock)
 package-lock.json
