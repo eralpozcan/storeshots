@@ -3,7 +3,7 @@
   "private": false,
   "description": "Generate professional App Store & Google Play screenshots with AI-powered copywriting, device mockups, and smart slide ordering",
   "author": "Eralp Ozcan",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/eralpozcan/storeshots.git"

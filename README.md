@@ -10,7 +10,7 @@ Generate professional, production-ready screenshots for **Apple App Store** and 
 ![Vue 3](https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white)
 ![Nuxt UI](https://img.shields.io/badge/Nuxt%20UI-4-1173d4)
 ![TailwindCSS](https://img.shields.io/badge/Tailwind-4-38B2AC?logo=tailwindcss&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-blue)
+![License](https://img.shields.io/badge/License-AGPL--3.0-blue)
 
 ---
 
@@ -252,4 +252,8 @@ Areas of interest:
 
 ## License
 
-[MIT](LICENSE)
+[GNU Affero General Public License v3.0 or later](LICENSE) (AGPL-3.0-or-later).
+
+Storeshots is free software. If you modify and run Storeshots as a network service (SaaS), the AGPL requires you to make the source code of your modified version available to your users. Self-hosting for your own team or customers is fine — forking it to run a competing hosted service requires you to open-source your changes.
+
+**Pro templates & premium features** are developed in a separate repository under a commercial license and are **not** covered by this AGPL release.
