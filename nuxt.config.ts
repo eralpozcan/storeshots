@@ -1,5 +1,12 @@
 export default defineNuxtConfig({
   modules: ['@nuxt/ui', '@nuxt/fonts', 'nuxt-security', '@nuxtjs/seo'],
+  // The whole site is designed light-only (landing + legal + editor all assume a white canvas).
+  // Forcing the color mode prevents @nuxtjs/color-mode from flipping the body background
+  // to dark on systems with `prefers-color-scheme: dark`, which made legal pages unreadable.
+  colorMode: {
+    preference: 'light',
+    fallback: 'light',
+  },
   css: ['~/assets/css/main.css'],
   devServer: { port: 3005 },
   compatibilityDate: '2025-01-01',
@@ -66,14 +73,49 @@ export default defineNuxtConfig({
       type: 'Organization',
       name: 'Storeshots',
       url: 'https://storeshots.org',
-      logo: '/logo.png',
+      logo: 'https://storeshots.org/logo.png',
+      sameAs: [
+        'https://github.com/eralpozcan/storeshots',
+      ],
     },
   },
   sitemap: {
     enabled: true,
+    exclude: ['/editor'],
+    urls: [
+      { loc: '/', changefreq: 'weekly', priority: 1.0, lastmod: new Date().toISOString() },
+      { loc: '/privacy', changefreq: 'yearly', priority: 0.3 },
+      { loc: '/cookies', changefreq: 'yearly', priority: 0.3 },
+      { loc: '/terms', changefreq: 'yearly', priority: 0.3 },
+    ],
   },
   robots: {
     enabled: true,
+    sitemap: ['https://storeshots.org/sitemap.xml'],
+    groups: [
+      // Allow all generic crawlers
+      { userAgent: ['*'], allow: '/', disallow: ['/editor'] },
+      // Explicit allowlist — AI search / answer engines (read-time retrieval)
+      { userAgent: ['GPTBot'], allow: '/' },
+      { userAgent: ['OAI-SearchBot'], allow: '/' },
+      { userAgent: ['ChatGPT-User'], allow: '/' },
+      { userAgent: ['ClaudeBot'], allow: '/' },
+      { userAgent: ['Claude-Web'], allow: '/' },
+      { userAgent: ['PerplexityBot'], allow: '/' },
+      { userAgent: ['Perplexity-User'], allow: '/' },
+      { userAgent: ['Googlebot'], allow: '/' },
+      { userAgent: ['Bingbot'], allow: '/' },
+      // Explicit denylist — training-only crawlers
+      { userAgent: ['CCBot'], disallow: '/' },
+      { userAgent: ['anthropic-ai'], disallow: '/' },
+      { userAgent: ['Bytespider'], disallow: '/' },
+      { userAgent: ['Applebot-Extended'], disallow: '/' },
+      { userAgent: ['Google-Extended'], disallow: '/' },
+      { userAgent: ['FacebookBot'], disallow: '/' },
+      { userAgent: ['meta-externalagent'], disallow: '/' },
+      { userAgent: ['Amazonbot'], disallow: '/' },
+      { userAgent: ['cohere-ai'], disallow: '/' },
+    ],
   },
   security: {
     headers: {

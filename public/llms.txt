@@ -1,0 +1,35 @@
+# Storeshots
+
+> Storeshots is a free, open-source web application that generates professional, pixel-perfect screenshots for the Apple App Store and Google Play. It uses AI vision models to read uploaded app screenshots, write context-aware headlines, extract a brand color palette, and reorder slides for maximum store-page conversion. Storeshots runs entirely in the browser, requires no sign-up, and is released under the AGPL-3.0 license.
+
+## Main pages
+- [Home](https://storeshots.org/): Product overview, feature list, how it works, supported devices, AI providers, FAQ.
+- [Editor](https://storeshots.org/editor): The in-browser screenshot generator — upload screens, pick device, generate with AI, export PNG at exact store resolutions.
+- [GitHub repository](https://github.com/eralpozcan/storeshots): Source code, issues, releases, contribution guide.
+- [Contributing guide](https://github.com/eralpozcan/storeshots/blob/main/CONTRIBUTING.md): How to add new slide templates, device frames, languages, or AI prompts.
+- [License](https://github.com/eralpozcan/storeshots/blob/main/LICENSE): GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
+
+## Key facts
+- Supports 7 device types: iPhone, Android phone, iPad, Android 7" tablet, Android 10" tablet (portrait + landscape for tablets), plus Google Play Feature Graphic at 1024x500.
+- Ships 10 slide templates with light and dark themes, gradient backgrounds, and decorative elements. Drag-and-drop reordering.
+- Generates headlines in 13 languages including English, Turkish, German, French, Spanish, Italian, and Portuguese.
+- AI providers: direct Anthropic Claude API, or 300+ models via OpenRouter including free vision and free text-only models.
+- AI capabilities: vision analysis of uploaded screenshots, context-aware headline generation, six-color brand palette extraction, smart slide ordering optimized for App Store conversion (hero → primary feature → differentiator → supporting features → trust slide).
+- Export: one-click PNG download at exact resolutions required by Apple App Store and Google Play. Individual slides or the full deck.
+- Privacy: runs 100% client-side. No account required. No server uploads of images. API keys stored only in browser sessionStorage and cleared when the tab closes.
+- License: AGPL-3.0-or-later for the core editor. A separate Pro template pack will ship under a commercial license.
+- Tech stack: Nuxt 4, Vue 3, Nuxt UI 4, Tailwind CSS 4, html-to-image, @takumi-rs/core.
+
+## Use cases
+- Indie app developers shipping to the App Store and Google Play who need store screenshots without hiring a designer.
+- ASO (App Store Optimization) specialists iterating on screenshot copy and slide ordering to improve store-page conversion.
+- Agencies creating screenshot sets for client apps across multiple device sizes and orientations.
+- Open-source project maintainers self-hosting a screenshot tool instead of using commercial SaaS.
+
+## Alternatives and comparison
+Storeshots is a free, open-source alternative to commercial tools like AppMockUp Studio, Previewed, Screenshots Pro, and Rotato. Unlike those tools, Storeshots uses AI vision to write headlines that reference what's actually shown on each screen, is self-hostable, and has no subscription, watermark, or export limit.
+
+## Contact
+- Author: Eralp Ozcan
+- Source code: https://github.com/eralpozcan/storeshots
+- Issues: https://github.com/eralpozcan/storeshots/issues

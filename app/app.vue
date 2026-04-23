@@ -1,6 +1,11 @@
 <script setup lang="ts">
 const isMobile = ref(false)
 const currentUrl = ref('')
+const route = useRoute()
+
+// Mobile warning only makes sense on the editor (small screens can't use the design surface).
+// Landing + legal pages are responsive and must remain visible on mobile.
+const showMobileWarning = computed(() => isMobile.value && route.path.startsWith('/editor'))
 
 onMounted(() => {
   currentUrl.value = window.location.hostname
@@ -15,7 +20,7 @@ onMounted(() => {
   <!-- Mobile warning overlay -->
   <Transition name="fade">
     <div
-      v-if="isMobile"
+      v-if="showMobileWarning"
       class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-8 text-center"
     >
       <!-- Icon -->
@@ -59,7 +64,13 @@ onMounted(() => {
     </div>
   </Transition>
 
-  <NuxtPage />
+  <NuxtLayout>
+    <NuxtPage />
+  </NuxtLayout>
+
+  <ClientOnly>
+    <CookieBanner />
+  </ClientOnly>
 </template>
 
 <style scoped>
