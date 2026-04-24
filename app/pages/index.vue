@@ -307,24 +307,139 @@ const stats = [
           Runs 100% in your browser. No account. No server uploads. API keys stay in your tab.
         </p>
 
-        <!-- Hero visual -->
+        <!-- Hero visual — dual platform preview -->
         <div class="mt-16 sm:mt-20 relative">
           <div class="absolute inset-x-0 -bottom-8 h-40 bg-gradient-to-t from-white to-transparent z-10 pointer-events-none" />
-          <div class="relative mx-auto max-w-5xl">
+          <div class="relative mx-auto max-w-3xl">
             <div class="absolute -inset-6 bg-gradient-to-tr from-blue-500/20 via-indigo-500/10 to-purple-500/20 rounded-[2rem] blur-2xl" />
-            <div class="relative rounded-2xl border border-gray-200 bg-white shadow-2xl shadow-gray-900/10 overflow-hidden">
-              <div class="flex items-center gap-1.5 px-4 py-2.5 border-b border-gray-200 bg-gray-50">
-                <span class="size-2.5 rounded-full bg-red-400" />
-                <span class="size-2.5 rounded-full bg-yellow-400" />
-                <span class="size-2.5 rounded-full bg-green-400" />
-                <span class="ml-3 text-xs font-mono text-gray-500 truncate">storeshots.org / editor</span>
-              </div>
-              <img
-                src="/mockup.png"
-                alt="Storeshots editor preview with AI-generated App Store screenshots"
-                class="w-full block"
-                loading="eager"
-              >
+
+            <div class="relative grid grid-cols-2 gap-4 sm:gap-8 items-end">
+              <!-- App Store slide (iPhone) -->
+              <figure class="flex flex-col items-center">
+                <figcaption class="mb-3 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                  <UIcon
+                    name="i-lucide-apple"
+                    class="size-3.5"
+                  />
+                  App Store · iPhone 6.7"
+                </figcaption>
+                <div class="relative w-full max-w-[220px] aspect-[9/19.5] rounded-[2rem] bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-4 shadow-2xl shadow-indigo-900/30 ring-1 ring-black/5">
+                  <div class="text-center text-white pt-1">
+                    <div class="text-[13px] sm:text-sm font-bold leading-tight tracking-tight">
+                      Track every rental<br>in one tap.
+                    </div>
+                    <div class="mt-1 text-[9px] opacity-80 font-medium">
+                      AI-generated headline
+                    </div>
+                  </div>
+                  <!-- Phone frame -->
+                  <div class="mt-3 mx-auto w-full aspect-[9/17] rounded-[1.25rem] bg-gray-900 p-1.5 shadow-xl ring-2 ring-white/20">
+                    <div class="relative w-full h-full rounded-[1rem] bg-white overflow-hidden">
+                      <div class="absolute top-1 left-1/2 -translate-x-1/2 h-3 w-12 rounded-full bg-gray-900 z-10" />
+                      <!-- Fake app UI -->
+                      <div class="h-full flex flex-col pt-5 px-2 bg-gradient-to-b from-blue-50 to-white">
+                        <div class="text-[8px] font-bold text-gray-900 px-1">
+                          Dashboard
+                        </div>
+                        <div class="mt-1.5 rounded-md bg-blue-600 text-white p-1.5">
+                          <div class="text-[7px] opacity-80">
+                            Monthly rent
+                          </div>
+                          <div class="text-[11px] font-bold leading-none mt-0.5">
+                            ₺42,500
+                          </div>
+                        </div>
+                        <div class="mt-1 space-y-1">
+                          <div
+                            v-for="n in 3"
+                            :key="n"
+                            class="flex items-center gap-1 rounded bg-white shadow-sm px-1 py-1"
+                          >
+                            <div class="size-3 rounded bg-emerald-400" />
+                            <div class="flex-1">
+                              <div class="h-1 w-8 rounded bg-gray-300" />
+                              <div class="h-1 w-5 rounded bg-gray-200 mt-0.5" />
+                            </div>
+                            <div class="h-1 w-3 rounded bg-gray-300" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </figure>
+
+              <!-- Google Play slide (Android) -->
+              <figure class="flex flex-col items-center">
+                <figcaption class="mb-3 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                  <UIcon
+                    name="i-lucide-play"
+                    class="size-3.5"
+                  />
+                  Google Play · Android
+                </figcaption>
+                <div class="relative w-full max-w-[220px] aspect-[9/19.5] rounded-[2rem] bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-4 shadow-2xl shadow-emerald-900/30 ring-1 ring-black/5">
+                  <div class="text-center text-white pt-1">
+                    <div class="text-[13px] sm:text-sm font-bold leading-tight tracking-tight">
+                      Know your cash flow<br>before month-end.
+                    </div>
+                    <div class="mt-1 text-[9px] opacity-90 font-medium">
+                      Smart-ordered slide · 02
+                    </div>
+                  </div>
+                  <!-- Phone frame (Android — squarer) -->
+                  <div class="mt-3 mx-auto w-full aspect-[9/17] rounded-[0.9rem] bg-gray-900 p-1.5 shadow-xl ring-2 ring-white/20">
+                    <div class="relative w-full h-full rounded-[0.6rem] bg-white overflow-hidden">
+                      <div class="absolute top-1 right-2 size-1.5 rounded-full bg-gray-900 z-10" />
+                      <!-- Fake app UI -->
+                      <div class="h-full flex flex-col pt-4 px-2 bg-gradient-to-b from-emerald-50 to-white">
+                        <div class="flex items-center justify-between px-1">
+                          <div class="text-[8px] font-bold text-gray-900">
+                            Cash flow
+                          </div>
+                          <div class="text-[7px] text-emerald-600 font-bold">
+                            +12%
+                          </div>
+                        </div>
+                        <!-- Fake chart -->
+                        <div class="mt-1.5 h-10 rounded-md bg-white shadow-sm p-1 flex items-end gap-0.5">
+                          <div
+                            v-for="(h, i) in [30, 45, 35, 60, 50, 75, 90]"
+                            :key="i"
+                            class="flex-1 rounded-sm bg-gradient-to-t from-emerald-500 to-teal-400"
+                            :style="{ height: h + '%' }"
+                          />
+                        </div>
+                        <div class="mt-1 grid grid-cols-2 gap-1">
+                          <div
+                            v-for="n in 4"
+                            :key="n"
+                            class="rounded bg-white shadow-sm p-1"
+                          >
+                            <div class="h-1 w-4 rounded bg-gray-300" />
+                            <div class="h-1.5 w-6 rounded bg-gray-800 mt-0.5" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </figure>
+            </div>
+
+            <!-- Caption strip -->
+            <div class="mt-6 mx-auto max-w-md flex items-center justify-center gap-2 text-[11px] font-medium text-gray-500">
+              <span class="inline-flex items-center gap-1">
+                <span class="size-1.5 rounded-full bg-blue-500" />
+                1290×2796
+              </span>
+              <span class="text-gray-300">·</span>
+              <span class="inline-flex items-center gap-1">
+                <span class="size-1.5 rounded-full bg-emerald-500" />
+                1080×1920
+              </span>
+              <span class="text-gray-300">·</span>
+              <span>PNG export · pixel-perfect</span>
             </div>
           </div>
         </div>
@@ -742,10 +857,9 @@ const stats = [
               <UButton
                 to="/editor"
                 size="xl"
-                color="neutral"
-                variant="outline"
+                variant="ghost"
                 trailing-icon="i-lucide-arrow-right"
-                class="text-white border-white/30 hover:bg-white/10"
+                :ui="{ base: 'bg-transparent text-white ring-1 ring-inset ring-white/30 hover:bg-white/10 hover:text-white' }"
               >
                 Open the editor
               </UButton>
