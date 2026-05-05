@@ -1,5 +1,12 @@
 export default defineNuxtConfig({
-  modules: ['@nuxt/ui', '@nuxt/fonts', 'nuxt-security', '@nuxtjs/seo'],
+  modules: ['@nuxt/ui', '@nuxt/fonts', 'nuxt-security', '@nuxtjs/seo', '@nuxt/scripts'],
+  scripts: {
+    registry: {
+      // IDs come from env: NUXT_PUBLIC_SCRIPTS_GOOGLE_ANALYTICS_ID / NUXT_PUBLIC_SCRIPTS_GOOGLE_TAG_MANAGER_ID
+      googleAnalytics: true,
+      googleTagManager: true,
+    },
+  },
   // The whole site is designed light-only (landing + legal + editor all assume a white canvas).
   // Forcing the color mode prevents @nuxtjs/color-mode from flipping the body background
   // to dark on systems with `prefers-color-scheme: dark`, which made legal pages unreadable.
@@ -30,6 +37,14 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
+      script: [
+        {
+          // Google Consent Mode v2 — set defaults to `denied` BEFORE GTM/GA loads.
+          // Storage flips to `granted` only after the user accepts via the cookie banner.
+          innerHTML: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}window.gtag=gtag;gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',functionality_storage:'denied',personalization_storage:'denied',security_storage:'granted',wait_for_update:500});`,
+          tagPriority: 'critical',
+        },
+      ],
       title: 'Storeshots — App Store & Google Play Screenshot Generator',
       meta: [
         { name: 'description', content: 'Generate professional App Store & Google Play screenshots with AI-powered copywriting, device mockups, and smart slide ordering. Free & open source.' },
@@ -121,10 +136,10 @@ export default defineNuxtConfig({
     headers: {
       contentSecurityPolicy: {
         'img-src': ["'self'", 'data:', 'blob:', 'https:'],
-        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://www.googletagmanager.com', 'https://www.google-analytics.com'],
         'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
-        'connect-src': ["'self'", 'https://fonts.googleapis.com', 'https://fonts.gstatic.com'],
+        'connect-src': ["'self'", 'https://fonts.googleapis.com', 'https://fonts.gstatic.com', 'https://www.googletagmanager.com', 'https://www.google-analytics.com', 'https://*.analytics.google.com', 'https://*.google-analytics.com'],
         'worker-src': ["'self'", 'blob:'],
       },
       crossOriginEmbedderPolicy: false,

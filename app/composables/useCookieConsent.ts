@@ -33,6 +33,42 @@ const state = ref<CookieConsentState>(defaultState())
 const loaded = ref(false)
 const bannerVisible = ref(false)
 
+// Push Google Consent Mode v2 update via dataLayer.
+// The default state is set to `denied` by an inline script in nuxt.config head,
+// so GTM/GA load (auto-triggered by @nuxt/scripts) but stay dormant until we
+// flip categories to `granted` here.
+function syncGoogleConsent() {
+  if (import.meta.server) return
+  const cats = state.value.categories
+  const w = window as unknown as { dataLayer?: unknown[], gtag?: (...args: unknown[]) => void }
+  w.dataLayer = w.dataLayer || []
+  // Use the same arguments-array pattern gtag.js uses, so it works both before
+  // and after the GTM/GA script defines `gtag` globally.
+  w.dataLayer.push({
+    event: 'consent_update',
+    consent: {
+      analytics_storage: cats.analytics ? 'granted' : 'denied',
+      ad_storage: cats.marketing ? 'granted' : 'denied',
+      ad_user_data: cats.marketing ? 'granted' : 'denied',
+      ad_personalization: cats.marketing ? 'granted' : 'denied',
+      functionality_storage: cats.functional ? 'granted' : 'denied',
+      personalization_storage: cats.functional ? 'granted' : 'denied',
+      security_storage: 'granted',
+    },
+  })
+  if (typeof w.gtag === 'function') {
+    w.gtag('consent', 'update', {
+      analytics_storage: cats.analytics ? 'granted' : 'denied',
+      ad_storage: cats.marketing ? 'granted' : 'denied',
+      ad_user_data: cats.marketing ? 'granted' : 'denied',
+      ad_personalization: cats.marketing ? 'granted' : 'denied',
+      functionality_storage: cats.functional ? 'granted' : 'denied',
+      personalization_storage: cats.functional ? 'granted' : 'denied',
+      security_storage: 'granted',
+    })
+  }
+}
+
 function readStored(): CookieConsentState | null {
   if (import.meta.server) return null
   try {
@@ -71,6 +107,7 @@ export function useCookieConsent() {
     const stored = readStored()
     if (stored) {
       state.value = stored
+      syncGoogleConsent()
       bannerVisible.value = false
     }
     else {
@@ -94,6 +131,7 @@ export function useCookieConsent() {
       categories: { necessary: true, functional: true, analytics: true, marketing: true },
     }
     writeStored(state.value)
+    syncGoogleConsent()
     bannerVisible.value = false
   }
 
@@ -104,6 +142,7 @@ export function useCookieConsent() {
       categories: { necessary: true, functional: false, analytics: false, marketing: false },
     }
     writeStored(state.value)
+    syncGoogleConsent()
     bannerVisible.value = false
   }
 
@@ -119,6 +158,7 @@ export function useCookieConsent() {
       },
     }
     writeStored(state.value)
+    syncGoogleConsent()
     bannerVisible.value = false
   }
 
@@ -128,6 +168,7 @@ export function useCookieConsent() {
       catch { /* noop */ }
     }
     state.value = defaultState()
+    syncGoogleConsent()
     bannerVisible.value = true
   }
 
