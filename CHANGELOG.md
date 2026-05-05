@@ -4,8 +4,6 @@ All notable changes to Storeshots are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project loosely
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
 ## [0.2.1] — 2026-05-05
 
 ### Added
@@ -87,7 +85,6 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
-[Unreleased]: https://github.com/eralpozcan/storeshots/compare/v0.2.1...HEAD
 [0.2.1]: https://github.com/eralpozcan/storeshots/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/eralpozcan/storeshots/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/eralpozcan/storeshots/releases/tag/v0.1.0
