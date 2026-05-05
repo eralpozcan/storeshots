@@ -222,6 +222,12 @@ const stats = [
             href="#faq"
             class="hover:text-gray-900 transition-colors"
           >FAQ</a>
+          <NuxtLink
+            to="/changelog"
+            class="hover:text-gray-900 transition-colors"
+          >
+            Changelog
+          </NuxtLink>
         </div>
 
         <div class="flex items-center gap-2">
@@ -929,6 +935,12 @@ const stats = [
             class="hover:text-gray-900"
           >
             Terms
+          </NuxtLink>
+          <NuxtLink
+            to="/changelog"
+            class="hover:text-gray-900"
+          >
+            Changelog
           </NuxtLink>
           <button
             type="button"

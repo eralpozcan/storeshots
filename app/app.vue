@@ -1,4 +1,14 @@
 <script setup lang="ts">
+const { public: pub } = useRuntimeConfig()
+const umamiWebsiteId = (pub.umamiWebsiteId || '').toString()
+if (umamiWebsiteId) {
+  useScriptUmamiAnalytics({
+    websiteId: umamiWebsiteId,
+    hostUrl: (pub.umamiHost || 'https://cloud.umami.is').toString(),
+    scriptOptions: { trigger: scriptsConsent },
+  })
+}
+
 const isMobile = ref(false)
 const currentUrl = ref('')
 const route = useRoute()

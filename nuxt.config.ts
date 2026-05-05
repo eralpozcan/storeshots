@@ -1,10 +1,10 @@
 export default defineNuxtConfig({
   modules: ['@nuxt/ui', '@nuxt/fonts', 'nuxt-security', '@nuxtjs/seo', '@nuxt/scripts'],
-  scripts: {
-    registry: {
-      // IDs come from env: NUXT_PUBLIC_SCRIPTS_GOOGLE_ANALYTICS_ID / NUXT_PUBLIC_SCRIPTS_GOOGLE_TAG_MANAGER_ID
-      googleAnalytics: true,
-      googleTagManager: true,
+  runtimeConfig: {
+    public: {
+      umamiWebsiteId: '',
+      // Defaults to Umami Cloud. Override for self-host.
+      umamiHost: 'https://cloud.umami.is',
     },
   },
   // The whole site is designed light-only (landing + legal + editor all assume a white canvas).
@@ -37,14 +37,6 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      script: [
-        {
-          // Google Consent Mode v2 — set defaults to `denied` BEFORE GTM/GA loads.
-          // Storage flips to `granted` only after the user accepts via the cookie banner.
-          innerHTML: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}window.gtag=gtag;gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',functionality_storage:'denied',personalization_storage:'denied',security_storage:'granted',wait_for_update:500});`,
-          tagPriority: 'critical',
-        },
-      ],
       title: 'Storeshots — App Store & Google Play Screenshot Generator',
       meta: [
         { name: 'description', content: 'Generate professional App Store & Google Play screenshots with AI-powered copywriting, device mockups, and smart slide ordering. Free & open source.' },
@@ -102,6 +94,7 @@ export default defineNuxtConfig({
       { loc: '/privacy', changefreq: 'yearly', priority: 0.3 },
       { loc: '/cookies', changefreq: 'yearly', priority: 0.3 },
       { loc: '/terms', changefreq: 'yearly', priority: 0.3 },
+      { loc: '/changelog', changefreq: 'weekly', priority: 0.5 },
     ],
   },
   robots: {
@@ -137,10 +130,10 @@ export default defineNuxtConfig({
       contentSecurityPolicy: {
         'base-uri': ["'self'"],
         'img-src': ["'self'", 'data:', 'blob:', 'https:'],
-        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://www.googletagmanager.com', 'https://www.google-analytics.com'],
+        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://cloud.umami.is'],
         'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
-        'connect-src': ["'self'", 'https://fonts.googleapis.com', 'https://fonts.gstatic.com', 'https://www.googletagmanager.com', 'https://www.google-analytics.com', 'https://*.analytics.google.com', 'https://*.google-analytics.com'],
+        'connect-src': ["'self'", 'https://fonts.googleapis.com', 'https://fonts.gstatic.com', 'https://cloud.umami.is', 'https://api-gateway.umami.dev'],
         'worker-src': ["'self'", 'blob:'],
       },
       crossOriginEmbedderPolicy: false,

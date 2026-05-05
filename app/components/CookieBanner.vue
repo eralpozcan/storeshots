@@ -56,7 +56,7 @@ const categoryList: {
     key: 'analytics',
     title: 'Analytics',
     required: false,
-    desc: 'Anonymous, aggregated usage analytics (page views, feature usage) so we can improve the product. No personal profiles, no cross-site tracking.',
+    desc: 'Privacy-first, cookieless analytics via Umami (MIT-licensed) so we can see which features are used. No cookies, no IP storage, no cross-site tracking, no profiles. You can still opt out.',
   },
   {
     key: 'marketing',

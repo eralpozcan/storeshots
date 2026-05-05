@@ -111,6 +111,12 @@ const { openSettings } = useCookieConsent()
           >
             Terms
           </NuxtLink>
+          <NuxtLink
+            to="/changelog"
+            class="hover:text-gray-900"
+          >
+            Changelog
+          </NuxtLink>
           <button
             type="button"
             class="hover:text-gray-900 cursor-pointer"
