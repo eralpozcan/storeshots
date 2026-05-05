@@ -1,6 +1,6 @@
 {
   "name": "storeshots",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": false,
   "description": "Generate professional App Store & Google Play screenshots with AI-powered copywriting, device mockups, and smart slide ordering",
   "author": "Eralp Ozcan",
@@ -34,7 +34,7 @@
     "@nuxtjs/seo": "^5.1.3",
     "@takumi-rs/core": "^1.0.7",
     "html-to-image": "^1.11.13",
-    "isomorphic-dompurify": "^3.12.0",
+    "jagajs": "^1.5.0",
     "marked": "^18.0.3",
     "nuxt": "^4.2.2",
     "nuxt-security": "^2.5.1"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { marked } from 'marked'
-import DOMPurify from 'isomorphic-dompurify'
+import { sanitize } from 'jagajs/sanitize'
 // Vite ?raw import: bundles CHANGELOG.md from the repo root as a string
 // so the page stays fully static — no runtime fetch, no extra route.
 import changelogSource from '~~/CHANGELOG.md?raw'
@@ -15,14 +15,10 @@ useSeoMeta({
 })
 
 marked.setOptions({ gfm: true, breaks: false })
-// CHANGELOG.md is repo-controlled, but a malicious PR could still try to slip
-// HTML into it. Sanitise the rendered output as a defence-in-depth layer so
-// review failures can't escalate to stored XSS on the live site.
-const html = computed(() =>
-  DOMPurify.sanitize(marked.parse(changelogSource) as string, {
-    USE_PROFILES: { html: true },
-  }),
-)
+// CHANGELOG.md is repo-controlled, but a malicious PR could still slip raw
+// HTML in. jagajs sanitises the rendered output with no JSDOM dependency,
+// so it works in both the browser and the Netlify Functions runtime.
+const html = computed(() => sanitize(marked.parse(changelogSource) as string).toString())
 </script>
 
 <template>

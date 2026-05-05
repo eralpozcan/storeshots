@@ -76,8 +76,12 @@ export default defineNuxtConfig({
   },
   vite: {
     optimizeDeps: {
-      include: ['html-to-image', 'isomorphic-dompurify'],
+      include: ['html-to-image', 'jagajs/sanitize', 'marked'],
     },
+  },
+  routeRules: {
+    // Static, content-only — prerender so Netlify serves plain HTML, no Function call.
+    '/changelog': { prerender: true },
   },
   schemaOrg: {
     identity: {

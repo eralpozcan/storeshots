@@ -4,6 +4,18 @@ All notable changes to Storeshots are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project loosely
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] — 2026-05-06
+
+### Fixed
+- `/changelog` was crashing on Netlify Functions with
+  `require() of ES Module @exodus/bytes/encoding-lite.js not supported`,
+  bubbling up from `isomorphic-dompurify`'s JSDOM dependency. Replaced
+  the sanitiser with [jagajs](https://github.com/dgknbtl/jaga) — zero
+  dependencies, dual ESM/CJS exports, serverless-safe.
+- The page is now prerendered at build time (`routeRules: { '/changelog':
+  { prerender: true } }`), so Netlify serves it as static HTML and the
+  Functions runtime never touches it.
+
 ## [0.2.1] — 2026-05-05
 
 ### Added
@@ -85,6 +97,7 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
+[0.2.2]: https://github.com/eralpozcan/storeshots/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/eralpozcan/storeshots/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/eralpozcan/storeshots/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/eralpozcan/storeshots/releases/tag/v0.1.0
