@@ -21,7 +21,18 @@ const {
   config, device, orientation, sizeIdx, exporting, generating,
   ready, isTablet, canvasDims, slideConfig, sizePick,
   updateConfig, generateCopy, generateFullDesign,
+  exportProject, importProject,
 } = useScreenshots()
+
+// Hidden file input wired to importProject
+const importInputRef = ref<HTMLInputElement | null>(null)
+function triggerImport() { importInputRef.value?.click() }
+async function onImportFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) await importProject(file)
+  input.value = ''
+}
 
 // Device frame type mapping
 const deviceFrame = computed(() => {
@@ -181,6 +192,21 @@ async function exportPreset(preset: StorePreset) {
   }
 }
 
+const projectMenuItems = computed(() => [
+  {
+    label: 'Save project to file',
+    description: 'Download a .storeshots.json snapshot',
+    icon: 'i-lucide-download',
+    onSelect: exportProject,
+  },
+  {
+    label: 'Load project from file',
+    description: 'Replace current state from a saved .storeshots.json',
+    icon: 'i-lucide-upload',
+    onSelect: triggerImport,
+  },
+])
+
 const presetMenuItems = computed(() =>
   STORE_PRESETS.map(preset => ({
     label: preset.label,
@@ -319,9 +345,29 @@ onMounted(() => { ready.value = true })
           </select>
         </div>
 
-        <!-- Export buttons -->
+        <!-- Project + Export buttons -->
         <div class="shrink-0 flex items-stretch border-l border-gray-200 bg-white">
           <div class="px-4 py-2.5 flex items-center gap-2">
+            <UDropdownMenu
+              :items="projectMenuItems"
+              :disabled="!!exporting"
+            >
+              <UButton
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-folder"
+                :disabled="!!exporting"
+              >
+                Project
+              </UButton>
+            </UDropdownMenu>
+            <input
+              ref="importInputRef"
+              type="file"
+              accept="application/json,.json,.storeshots.json"
+              class="hidden"
+              @change="onImportFile"
+            >
             <UButton
               :loading="!!exporting"
               :disabled="!!exporting"
