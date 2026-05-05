@@ -4,6 +4,25 @@ All notable changes to Storeshots are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project loosely
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-05-06
+
+### Added
+- **Export bundles** — a new "Bundle" dropdown next to Export All produces
+  every size a target store accepts in a single ZIP. Three presets:
+  - **App Store**: iPhone 6.9", 6.5", 6.3", 6.1" + iPad Pro 12.9", 11"
+  - **Play Store**: Android Phone, 7" Tablet, 10" Tablet
+  - **Everything**: union of both
+  The flow walks each device + size, captures every slide, and downloads a
+  ZIP organised by `device-size` folders. Original device state is restored
+  after the run.
+- **Project save / load** — a "Project" dropdown with two actions:
+  - Save project → downloads a versioned `.storeshots.json` snapshot.
+    The file format is versioned (`__storeshots: 1`) so a future schema
+    change can refuse incompatible files cleanly.
+  - Load project → restores the editor from a snapshot. The exported file
+    strips the API key so a shared snapshot can never leak credentials;
+    on import the in-memory key is preserved so the user doesn't re-paste.
+
 ## [0.2.2] — 2026-05-06
 
 ### Fixed
@@ -97,6 +116,7 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
+[0.3.0]: https://github.com/eralpozcan/storeshots/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/eralpozcan/storeshots/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/eralpozcan/storeshots/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/eralpozcan/storeshots/compare/v0.1.0...v0.2.0
