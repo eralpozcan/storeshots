@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { toPng } from 'html-to-image'
+import JSZip from 'jszip'
 import type { Device, Orientation } from '~/utils/types'
-import { FGW, FGH } from '~/utils/canvas'
+import { FGW, FGH, STORE_PRESETS } from '~/utils/canvas'
+import type { StorePreset, PresetTarget } from '~/utils/canvas'
 import { SLIDE_COUNT_APPLE, SLIDE_COUNT_ANDROID } from '~/utils/defaults'
 
 definePageMeta({ layout: false })
@@ -113,6 +115,84 @@ async function exportAll() {
   }
   exporting.value = null
 }
+
+const slugLabel = (l: string) => l.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+
+// Bundle export: switches device/orientation through every target in the preset,
+// captures every size for every slide, and ZIPs the result. The editor flickers
+// between devices during the run — that's expected; the overlay tells the user
+// not to close the tab.
+async function exportPreset(preset: StorePreset) {
+  const origDevice = device.value
+  const origOrientation = orientation.value
+  const origSizeIdx = sizeIdx.value
+
+  const zip = new JSZip()
+  const appSlug = slugLabel(config.value.appName || 'app') || 'app'
+  let totalCaptured = 0
+  const totalToCapture = preset.targets.reduce((acc: number, t: PresetTarget) => {
+    const variantCount = (t.device === 'iphone' || t.device === 'ipad')
+      ? SLIDE_COUNT_APPLE
+      : SLIDE_COUNT_ANDROID
+    return acc + (variantCount * t.sizes.length)
+  }, 0)
+
+  try {
+    for (const target of preset.targets) {
+      device.value = target.device
+      orientation.value = target.orientation
+      sizeIdx.value = 0
+      // Wait for the editor DOM to swap to the new device frame and lay out.
+      await nextTick()
+      await new Promise(r => setTimeout(r, 700))
+
+      const variants = slideVariants.value
+      for (const size of target.sizes) {
+        const folderName = `${target.device}-${slugLabel(size.label)}-${size.w}x${size.h}`
+        const folder = zip.folder(folderName)
+        if (!folder) continue
+        for (let i = 0; i < variants.length; i++) {
+          const el = exportRefs.value[i]
+          if (!el) continue
+          totalCaptured++
+          exporting.value = `${preset.label} · ${totalCaptured}/${totalToCapture}`
+          const dataUrl = await captureElement(el, size.w, size.h)
+          const lbl = slugLabel(config.value.copy[i]?.label || '') || 'slide'
+          const filename = `${String(i + 1).padStart(2, '0')}-${lbl}.png`
+          folder.file(filename, dataUrl.split(',')[1] || '', { base64: true })
+        }
+      }
+    }
+
+    exporting.value = 'Zipping…'
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${appSlug}-${preset.key}.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  finally {
+    device.value = origDevice
+    orientation.value = origOrientation
+    sizeIdx.value = origSizeIdx
+    exporting.value = null
+  }
+}
+
+const presetMenuItems = computed(() =>
+  STORE_PRESETS.map(preset => ({
+    label: preset.label,
+    description: preset.description,
+    icon: preset.key === 'app-store'
+      ? 'i-lucide-apple'
+      : preset.key === 'play-store'
+        ? 'i-lucide-play'
+        : 'i-lucide-package',
+    onSelect: () => exportPreset(preset),
+  })),
+)
 
 const deviceOptions: { label: string; value: Device }[] = [
   { label: 'iPhone', value: 'iphone' },
@@ -239,15 +319,30 @@ onMounted(() => { ready.value = true })
           </select>
         </div>
 
-        <!-- Export button -->
-        <div class="shrink-0 px-4 py-2.5 border-l border-gray-200 bg-white">
-          <UButton
-            :loading="!!exporting"
-            :disabled="!!exporting"
-            @click="exportAll"
-          >
-            {{ exporting ? `Exporting… ${exporting}` : 'Export All' }}
-          </UButton>
+        <!-- Export buttons -->
+        <div class="shrink-0 flex items-stretch border-l border-gray-200 bg-white">
+          <div class="px-4 py-2.5 flex items-center gap-2">
+            <UButton
+              :loading="!!exporting"
+              :disabled="!!exporting"
+              @click="exportAll"
+            >
+              {{ exporting ? `Exporting… ${exporting}` : 'Export All' }}
+            </UButton>
+            <UDropdownMenu
+              :items="presetMenuItems"
+              :disabled="!!exporting || device === 'feature-graphic'"
+            >
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-package"
+                :disabled="!!exporting || device === 'feature-graphic'"
+              >
+                Bundle
+              </UButton>
+            </UDropdownMenu>
+          </div>
         </div>
       </div>
 
