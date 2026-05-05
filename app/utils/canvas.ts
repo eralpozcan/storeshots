@@ -1,3 +1,5 @@
+import type { Device, Orientation } from './types'
+
 // Canvas dimensions per device
 export const W = 1320;        export const H = 2868
 export const AW = 1080;       export const AH = 1920
@@ -38,6 +40,54 @@ export const IPAD_SIZES = [
   { label: 'iPad Pro 11"',   w: 1668, h: 2224 },
 ] as const
 export const FG_SIZES = [{ label: 'Feature Graphic', w: FGW, h: FGH }] as const
+
+// Store-bundle export presets — one click to produce every size a store accepts.
+export type PresetTarget = {
+  device: Device
+  orientation: Orientation
+  sizes: readonly { label: string; w: number; h: number }[]
+}
+
+export type StorePreset = {
+  key: string
+  label: string
+  description: string
+  targets: PresetTarget[]
+}
+
+export const STORE_PRESETS: StorePreset[] = [
+  {
+    key: 'app-store',
+    label: 'App Store',
+    description: 'iPhone 6.9", 6.5", 6.3", 6.1" + iPad Pro 12.9", 11"',
+    targets: [
+      { device: 'iphone', orientation: 'portrait', sizes: IPHONE_SIZES },
+      { device: 'ipad', orientation: 'portrait', sizes: IPAD_SIZES },
+    ],
+  },
+  {
+    key: 'play-store',
+    label: 'Play Store',
+    description: 'Android Phone, 7" Tablet, 10" Tablet',
+    targets: [
+      { device: 'android', orientation: 'portrait', sizes: ANDROID_SIZES },
+      { device: 'android-7', orientation: 'portrait', sizes: ANDROID_7P_SIZES },
+      { device: 'android-10', orientation: 'portrait', sizes: ANDROID_10P_SIZES },
+    ],
+  },
+  {
+    key: 'everything',
+    label: 'Everything',
+    description: 'App Store + Play Store, all sizes',
+    targets: [
+      { device: 'iphone', orientation: 'portrait', sizes: IPHONE_SIZES },
+      { device: 'ipad', orientation: 'portrait', sizes: IPAD_SIZES },
+      { device: 'android', orientation: 'portrait', sizes: ANDROID_SIZES },
+      { device: 'android-7', orientation: 'portrait', sizes: ANDROID_7P_SIZES },
+      { device: 'android-10', orientation: 'portrait', sizes: ANDROID_10P_SIZES },
+    ],
+  },
+]
 
 // Width formulas
 export function phoneW(cW: number, cH: number, clamp = 0.84)  { return Math.min(clamp, 0.72 * (cH / cW) * MK_RATIO) }

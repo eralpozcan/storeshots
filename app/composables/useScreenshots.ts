@@ -1,5 +1,5 @@
 import type { UserConfig, Device, Orientation, SlideConfig } from '~/utils/types'
-import { loadConfig, saveConfig } from '~/utils/defaults'
+import { loadConfig, saveConfig, DEFAULT_CONFIG } from '~/utils/defaults'
 import {
   W, H, AW, AH, AT7P_W, AT7P_H, AT7L_W, AT7L_H,
   AT10P_W, AT10P_H, AT10L_W, AT10L_H, IPAD_W, IPAD_H, FGW, FGH,
@@ -208,6 +208,90 @@ export function useScreenshots() {
     }
   }
 
+  // Versioned project file format. Bump when the schema changes incompatibly.
+  const PROJECT_FILE_VERSION = 1
+
+  function exportProject() {
+    if (import.meta.server) return
+    // Strip the API key so a shared file never leaks credentials.
+    const { ai, ...rest } = config.value
+    const payload = {
+      __storeshots: PROJECT_FILE_VERSION,
+      exportedAt: new Date().toISOString(),
+      config: {
+        ...rest,
+        ai: { provider: ai.provider, openrouterModel: ai.openrouterModel, apiKey: '' },
+      },
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const slug = (config.value.appName || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project'
+    a.download = `${slug}.storeshots.json`
+    a.href = url
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.add({
+      title: 'Project exported',
+      description: `${a.download} downloaded.`,
+      color: 'success',
+      icon: 'i-lucide-download',
+    })
+  }
+
+  async function importProject(file: File) {
+    if (import.meta.server) return
+    if (file.size > 50 * 1024 * 1024) {
+      toast.add({
+        title: 'File too large',
+        description: 'Project files must be under 50MB.',
+        color: 'error',
+        icon: 'i-lucide-triangle-alert',
+      })
+      return
+    }
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text)
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.__storeshots !== 'number') {
+        throw new Error('Not a Storeshots project file')
+      }
+      if (parsed.__storeshots > PROJECT_FILE_VERSION) {
+        throw new Error('Project was saved by a newer Storeshots version. Please update.')
+      }
+      const incoming = parsed.config || {}
+      // Merge over defaults so missing fields fall back rather than blowing up.
+      // Preserve the in-memory API key — imported files don't carry credentials.
+      const currentKey = config.value.ai.apiKey
+      config.value = {
+        ...DEFAULT_CONFIG,
+        ...incoming,
+        colors: { ...DEFAULT_CONFIG.colors, ...(incoming.colors || {}) },
+        images: { ...DEFAULT_CONFIG.images, ...(incoming.images || {}) },
+        ai: { ...DEFAULT_CONFIG.ai, ...(incoming.ai || {}), apiKey: currentKey },
+        copy: Array.isArray(incoming.copy) && incoming.copy.length ? incoming.copy : DEFAULT_CONFIG.copy,
+        features: Array.isArray(incoming.features) ? incoming.features : DEFAULT_CONFIG.features,
+        locale: typeof incoming.locale === 'string' ? incoming.locale : DEFAULT_CONFIG.locale,
+      }
+      saveConfig(config.value)
+      toast.add({
+        title: 'Project imported',
+        description: `${file.name} loaded successfully.`,
+        color: 'success',
+        icon: 'i-lucide-upload',
+      })
+    }
+    catch (e: any) {
+      toast.add({
+        title: 'Import failed',
+        description: e?.message || 'Could not parse project file.',
+        color: 'error',
+        icon: 'i-lucide-triangle-alert',
+        duration: 6000,
+      })
+    }
+  }
+
   return {
     config,
     device,
@@ -223,5 +307,7 @@ export function useScreenshots() {
     updateConfig,
     generateCopy,
     generateFullDesign,
+    exportProject,
+    importProject,
   }
 }
