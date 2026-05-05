@@ -6,6 +6,39 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-05-05
+
+### Added
+- **Update banner** — when a new deploy goes live, open tabs detect the change
+  by polling `/api/version` (every 5 min and on tab focus) and surface a
+  "Refresh" prompt instead of silently running stale assets that 404.
+- Explicit Netlify cache headers: `_nuxt/*` is `immutable` for a year, HTML is
+  always revalidated. Prevents the previous failure mode where a cached HTML
+  pointed at a hashed CSS file that the new deploy had already invalidated.
+- `buildId` now prefers Netlify's `COMMIT_REF` (git SHA) over a build-time
+  timestamp, so the same commit redeployed produces the same id and won't
+  trigger a spurious refresh prompt.
+
+### Security
+- **CSP hardened**: enabled per-request nonce via `nuxt-security` and removed
+  `'unsafe-inline'` from `script-src`. Hydration scripts now carry an explicit
+  nonce; `'strict-dynamic'` allows scripts loaded by trusted entry chunks
+  (e.g. Umami) without widening the host allowlist. `'unsafe-eval'` remains
+  pending a vendor audit.
+- **Changelog page** sanitises rendered Markdown with `isomorphic-dompurify`
+  as a defence-in-depth layer, so a malicious PR landing HTML in
+  `CHANGELOG.md` cannot escalate to stored XSS.
+- **`/api/generate-copy` input hardening**: enforced an 8MB body cap, typed
+  and length-bounded every field (provider must be `claude` or `openrouter`,
+  `slideCount` 1–12, max 12 images, 1.5MB per image), and rejected
+  unrecognised payloads early with `413`/`400`. `features` is correctly typed
+  as `string[]` (was briefly mis-typed during development).
+
+### Fixed
+- AI generation surfaced silent console errors when API keys were missing or
+  the upstream provider rejected the request. Errors now appear as user-facing
+  toasts via `useToast()` (Nuxt UI 4), backed by an `<UApp>` root wrapper.
+
 ## [0.2.0] — 2026-05-05
 
 ### Added
@@ -54,6 +87,7 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
-[Unreleased]: https://github.com/eralpozcan/storeshots/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/eralpozcan/storeshots/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/eralpozcan/storeshots/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/eralpozcan/storeshots/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/eralpozcan/storeshots/releases/tag/v0.1.0

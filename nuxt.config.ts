@@ -5,6 +5,10 @@ export default defineNuxtConfig({
       umamiWebsiteId: '',
       // Defaults to Umami Cloud. Override for self-host.
       umamiHost: 'https://cloud.umami.is',
+      // Baked at build time. Prefers Netlify's COMMIT_REF (git SHA) so the
+      // same commit redeployed produces the same id and doesn't trigger a
+      // spurious refresh prompt. Falls back to Date.now() for local dev.
+      buildId: process.env.COMMIT_REF || process.env.NETLIFY_BUILD_ID || Date.now().toString(),
     },
   },
   // The whole site is designed light-only (landing + legal + editor all assume a white canvas).
@@ -72,7 +76,7 @@ export default defineNuxtConfig({
   },
   vite: {
     optimizeDeps: {
-      include: ['html-to-image'],
+      include: ['html-to-image', 'isomorphic-dompurify'],
     },
   },
   schemaOrg: {
@@ -126,11 +130,16 @@ export default defineNuxtConfig({
     ],
   },
   security: {
+    nonce: true,
     headers: {
       contentSecurityPolicy: {
         'base-uri': ["'self'"],
         'img-src': ["'self'", 'data:', 'blob:', 'https:'],
-        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://cloud.umami.is'],
+        // `'unsafe-inline'` is intentionally absent: nuxt-security injects a
+        // per-request nonce into Nuxt's hydration scripts. `'unsafe-eval'`
+        // stays for now because some bundled vendor code still needs it; can
+        // be removed once we audit and prove no `eval`/`new Function` remains.
+        'script-src': ["'self'", "'nonce-{{nonce}}'", "'strict-dynamic'", "'unsafe-eval'", 'https://cloud.umami.is'],
         'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
         'connect-src': ["'self'", 'https://fonts.googleapis.com', 'https://fonts.gstatic.com', 'https://cloud.umami.is', 'https://api-gateway.umami.dev'],

@@ -15,6 +15,7 @@ node-compile-cache/
 # IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~

@@ -4,3 +4,21 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# Hashed assets are immutable — long cache, browser never re-fetches.
+[[headers]]
+  for = "/_nuxt/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# HTML must always be revalidated so a new deploy's hashed asset URLs
+# reach the user instead of a stale cached page that points at 404'd hashes.
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

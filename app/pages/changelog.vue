@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { marked } from 'marked'
+import DOMPurify from 'isomorphic-dompurify'
 // Vite ?raw import: bundles CHANGELOG.md from the repo root as a string
 // so the page stays fully static — no runtime fetch, no extra route.
 import changelogSource from '~~/CHANGELOG.md?raw'
@@ -14,7 +15,14 @@ useSeoMeta({
 })
 
 marked.setOptions({ gfm: true, breaks: false })
-const html = computed(() => marked.parse(changelogSource) as string)
+// CHANGELOG.md is repo-controlled, but a malicious PR could still try to slip
+// HTML into it. Sanitise the rendered output as a defence-in-depth layer so
+// review failures can't escalate to stored XSS on the live site.
+const html = computed(() =>
+  DOMPurify.sanitize(marked.parse(changelogSource) as string, {
+    USE_PROFILES: { html: true },
+  }),
+)
 </script>
 
 <template>

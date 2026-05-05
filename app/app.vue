@@ -27,7 +27,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Mobile warning overlay -->
+  <UApp>
+    <!-- Mobile warning overlay -->
   <Transition name="fade">
     <div
       v-if="showMobileWarning"
@@ -80,7 +81,9 @@ onMounted(() => {
 
   <ClientOnly>
     <CookieBanner />
+    <UpdateBanner />
   </ClientOnly>
+  </UApp>
 </template>
 
 <style scoped>

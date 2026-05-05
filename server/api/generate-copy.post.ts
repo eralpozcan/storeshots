@@ -123,18 +123,82 @@ function buildMessages(systemPrompt: string, userPrompt: string, images: string[
   }
 }
 
-export default defineEventHandler(async (event) => {
-  const body = await readBody(event)
-  const {
-    provider, apiKey, openrouterModel,
-    appName, appDescription, features,
-    slideCount = 7, locale = 'en',
-    mode = 'copy-only',
-    images = [],
-  } = body
+// Hard upper bound on the request body. Images are base64-encoded slides at
+// roughly 50–200KB each; ten slides plus prompt fields fit well under 8MB.
+// Anything larger is almost certainly abuse.
+const MAX_BODY_BYTES = 8 * 1024 * 1024
 
-  if (!apiKey) {
-    throw createError({ statusCode: 400, statusMessage: 'API key is required' })
+function ensureString(v: unknown, field: string, max: number, required = true): string {
+  if (v == null || v === '') {
+    if (required) throw createError({ statusCode: 400, statusMessage: `Missing field: ${field}` })
+    return ''
+  }
+  if (typeof v !== 'string') {
+    throw createError({ statusCode: 400, statusMessage: `Field "${field}" must be a string` })
+  }
+  if (v.length > max) {
+    throw createError({ statusCode: 413, statusMessage: `Field "${field}" too long` })
+  }
+  return v
+}
+
+export default defineEventHandler(async (event) => {
+  const contentLength = Number(getHeader(event, 'content-length') || 0)
+  if (contentLength > MAX_BODY_BYTES) {
+    throw createError({ statusCode: 413, statusMessage: 'Request body too large' })
+  }
+
+  const body = await readBody(event)
+  if (!body || typeof body !== 'object') {
+    throw createError({ statusCode: 400, statusMessage: 'Invalid body' })
+  }
+
+  const provider = ensureString(body.provider, 'provider', 32)
+  if (provider !== 'claude' && provider !== 'openrouter') {
+    throw createError({ statusCode: 400, statusMessage: 'provider must be "claude" or "openrouter"' })
+  }
+
+  const apiKey = ensureString(body.apiKey, 'apiKey', 512)
+  const openrouterModel = ensureString(body.openrouterModel, 'openrouterModel', 128, false)
+  const appName = ensureString(body.appName, 'appName', 200, false)
+  const appDescription = ensureString(body.appDescription, 'appDescription', 4000, false)
+  const locale = ensureString(body.locale ?? 'en', 'locale', 8, false)
+
+  // features is a list of short bullet strings collected from the editor.
+  let features: string[] = []
+  if (body.features != null) {
+    if (!Array.isArray(body.features)) {
+      throw createError({ statusCode: 400, statusMessage: 'features must be an array of strings' })
+    }
+    if (body.features.length > 50) {
+      throw createError({ statusCode: 400, statusMessage: 'Too many features' })
+    }
+    features = body.features.map((f: unknown, i: number) => {
+      if (typeof f !== 'string') {
+        throw createError({ statusCode: 400, statusMessage: `features[${i}] must be a string` })
+      }
+      if (f.length > 500) {
+        throw createError({ statusCode: 413, statusMessage: `features[${i}] too long` })
+      }
+      return f
+    })
+  }
+
+  const slideCount = Number(body.slideCount ?? 7)
+  if (!Number.isInteger(slideCount) || slideCount < 1 || slideCount > 12) {
+    throw createError({ statusCode: 400, statusMessage: 'slideCount must be 1–12' })
+  }
+
+  const mode = body.mode === 'full-design' ? 'full-design' : 'copy-only'
+
+  const images = Array.isArray(body.images) ? body.images : []
+  if (images.length > 12) {
+    throw createError({ statusCode: 400, statusMessage: 'Too many images' })
+  }
+  for (const img of images) {
+    if (typeof img !== 'string' || img.length > 1_500_000) {
+      throw createError({ statusCode: 413, statusMessage: 'Image payload too large' })
+    }
   }
 
   const systemPrompt = mode === 'full-design' ? DESIGN_SYSTEM_PROMPT : COPY_SYSTEM_PROMPT

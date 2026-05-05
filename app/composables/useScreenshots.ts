@@ -120,8 +120,32 @@ export function useScreenshots() {
     if (Object.keys(patch).length) updateConfig(patch)
   }
 
+  const toast = useToast()
+
+  // FetchError carries the server's validation reason on `data.statusMessage`;
+  // surface it to the user rather than only logging to the console.
+  function showAIError(prefix: string, e: any) {
+    const detail = e?.data?.statusMessage || e?.statusMessage || e?.message || 'Unknown error'
+    toast.add({
+      title: prefix,
+      description: detail,
+      color: 'error',
+      icon: 'i-lucide-triangle-alert',
+      duration: 6000,
+    })
+    console.error(prefix, e)
+  }
+
   async function generateCopy() {
-    if (!config.value.ai.apiKey) return
+    if (!config.value.ai.apiKey) {
+      toast.add({
+        title: 'API key missing',
+        description: 'Add an OpenRouter or Anthropic API key in AI settings before generating copy.',
+        color: 'warning',
+        icon: 'i-lucide-key',
+      })
+      return
+    }
     generating.value = true
     try {
       const images = getUploadedImages()
@@ -142,14 +166,22 @@ export function useScreenshots() {
       }) as { slides?: any[]; error?: string }
       applyAIResult(res)
     } catch (e: any) {
-      console.error('AI copy generation failed:', e)
+      showAIError('AI copy generation failed', e)
     } finally {
       generating.value = false
     }
   }
 
   async function generateFullDesign() {
-    if (!config.value.ai.apiKey) return
+    if (!config.value.ai.apiKey) {
+      toast.add({
+        title: 'API key missing',
+        description: 'Add an OpenRouter or Anthropic API key in AI settings before generating a design.',
+        color: 'warning',
+        icon: 'i-lucide-key',
+      })
+      return
+    }
     generating.value = true
     try {
       const images = getUploadedImages()
@@ -170,7 +202,7 @@ export function useScreenshots() {
       }) as { slides?: any[]; colors?: any; error?: string }
       applyAIResult(res)
     } catch (e: any) {
-      console.error('AI design generation failed:', e)
+      showAIError('AI design generation failed', e)
     } finally {
       generating.value = false
     }
