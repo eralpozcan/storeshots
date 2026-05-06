@@ -24,6 +24,14 @@ const {
   exportProject, importProject,
 } = useScreenshots()
 
+// Empty-state detection — true when the user hasn't uploaded any screenshots
+// at all yet. Drives a friendly banner over the slide grid that points back
+// to the Screenshots step.
+const hasAnyImages = computed(() => {
+  const imgs = config.value.images
+  return Object.values(imgs).some(arr => arr.some(Boolean))
+})
+
 // Inline slide-copy editor — open via the pencil overlay on each SlideCard.
 const editingSlide = ref<number | null>(null)
 const editingDraft = ref<{ label: string, headline: string }>({ label: '', headline: '' })
@@ -460,6 +468,25 @@ onMounted(() => { ready.value = true })
 
         <!-- Slide grid -->
         <template v-else>
+          <!-- Empty-state hint: shown until the user uploads their first screenshot. -->
+          <div
+            v-if="!hasAnyImages"
+            class="mx-auto max-w-[1100px] mt-6 mx-6 rounded-xl border border-dashed border-blue-300 bg-blue-50/50 px-5 py-4 flex items-center gap-3"
+          >
+            <UIcon
+              name="i-lucide-image-plus"
+              class="size-5 text-blue-600 shrink-0"
+            />
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-blue-900">
+                Add your first screenshot to bring slides to life
+              </p>
+              <p class="text-xs text-blue-700/80 mt-0.5">
+                Slides below are placeholders. Open the
+                <span class="font-semibold">Screenshots</span> step in the sidebar to upload.
+              </p>
+            </div>
+          </div>
           <div class="p-6 grid grid-cols-3 gap-6 max-w-[1100px] mx-auto">
             <SlideCard
               v-for="(v, i) in slideVariants"
