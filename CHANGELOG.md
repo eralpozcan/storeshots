@@ -4,6 +4,32 @@ All notable changes to Storeshots are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project loosely
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-05-06
+
+### Added
+- **Wizard sidebar** — sticky 5-step nav (Basics · Screenshots · AI ·
+  Headlines · Style) replaces the single-scroll dense sidebar. Only the
+  active step renders; a green dot marks completion per step heuristically.
+- **Basics step polish** — full-width icon dropzone with hover/preview/✕,
+  consistent inputs, description character counter (/600), and features as
+  a chip input (press Enter or comma to add, ✕ to remove).
+- **Inline slide edit** — pencil button on each preview card opens a modal
+  with label + headline fields. No more scrolling the sidebar to find slide N.
+- **Caption fine-tune drag** — new "Adjust" button on each slide enters a
+  drag-to-reposition mode. Pointer deltas are divided by the preview scale
+  to produce true canvas-pixel offsets, so the adjustment carries through
+  to bundle exports. Save / Reset / Cancel toolbar inside the card.
+
+### Changed
+- **Toolbar split into two rows** — Row 1: Home · App name · Project ·
+  Export · Bundle. Row 2: Device tabs · Orientation · Size. Frees the
+  action area, removes overflow on narrow viewports.
+- **Slide cards no longer click-to-download** — the entire card was a
+  download trigger, which produced accidental downloads when clicking
+  near the slide. Three explicit hover buttons now: ✏ Edit, ✥ Adjust,
+  ⬇ Download. The Feature Graphic preview gets an explicit Download
+  button too instead of being a giant click target.
+
 ## [0.3.0] — 2026-05-06
 
 ### Added
@@ -116,6 +142,7 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
+[0.4.0]: https://github.com/eralpozcan/storeshots/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/eralpozcan/storeshots/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/eralpozcan/storeshots/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/eralpozcan/storeshots/compare/v0.2.0...v0.2.1

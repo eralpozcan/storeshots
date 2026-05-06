@@ -1,6 +1,6 @@
 {
   "name": "storeshots",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": false,
   "description": "Generate professional App Store & Google Play screenshots with AI-powered copywriting, device mockups, and smart slide ordering",
   "author": "Eralp Ozcan",
