@@ -24,6 +24,18 @@ const {
   exportProject, importProject,
 } = useScreenshots()
 
+// Preview-card refs (rendered) — used by the thumbnails strip to scroll
+// to a specific slide. Distinct from `exportRefs` which point at the
+// offscreen full-size capture targets.
+const previewRefs = ref<(HTMLElement | null)[]>([])
+function setPreviewRef(i: number, el: any) {
+  previewRefs.value[i] = el as HTMLElement | null
+}
+function scrollToSlide(i: number) {
+  const el = previewRefs.value[i]
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
 // Empty-state detection — true when the user hasn't uploaded any screenshots
 // at all yet. Drives a friendly banner over the slide grid that points back
 // to the Screenshots step.
@@ -517,21 +529,40 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               </p>
             </div>
           </div>
+          <!-- Thumbnails strip — quick visual index of every slide. Click to jump. -->
+          <div class="sticky top-0 z-20 bg-gray-100/85 backdrop-blur border-b border-gray-200 px-6 py-2 flex gap-1.5 overflow-x-auto">
+            <button
+              v-for="(v, i) in slideVariants"
+              :key="`thumb-${i}`"
+              class="shrink-0 px-2.5 py-1 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors flex items-center gap-1.5"
+              :class="config.copy[i]?.label ? 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-600' : 'border-gray-200 bg-white/60 text-gray-400 hover:text-gray-600'"
+              :title="`Jump to slide ${i + 1}`"
+              @click="scrollToSlide(i)"
+            >
+              <span class="text-gray-400 font-mono">{{ String(i + 1).padStart(2, '0') }}</span>
+              <span class="truncate max-w-[110px]">{{ config.copy[i]?.label || `Slide ${i + 1}` }}</span>
+            </button>
+          </div>
+
           <div class="p-6 grid grid-cols-3 gap-6 max-w-[1100px] mx-auto">
-            <SlideCard
+            <div
               v-for="(v, i) in slideVariants"
               :key="`${device}-${orientation}-${i}`"
-              :index="i"
-              :variant="v"
-              :cfg="slideConfig"
-              :c-w="canvasDims.cW"
-              :c-h="canvasDims.cH"
-              :label="config.copy[i]?.label || `Slide ${i + 1}`"
-              :device-frame="deviceFrame"
-              @export="exportOne(i)"
-              @edit="openEdit(i)"
-              @position="(v: { dx: number, dy: number } | null) => setSlidePosition(i, v)"
-            />
+              :ref="(el) => setPreviewRef(i, el)"
+            >
+              <SlideCard
+                :index="i"
+                :variant="v"
+                :cfg="slideConfig"
+                :c-w="canvasDims.cW"
+                :c-h="canvasDims.cH"
+                :label="config.copy[i]?.label || `Slide ${i + 1}`"
+                :device-frame="deviceFrame"
+                @export="exportOne(i)"
+                @edit="openEdit(i)"
+                @position="(v: { dx: number, dy: number } | null) => setSlidePosition(i, v)"
+              />
+            </div>
           </div>
 
           <!-- Offscreen export targets -->
