@@ -23,7 +23,20 @@ const {
   ready, isTablet, canvasDims, slideConfig, sizePick,
   updateConfig, generateCopy, generateFullDesign,
   exportProject, importProject,
+  extractColorsFromScreenshots,
+  copyVariants, generateCopyVariants, applyVariant,
 } = useScreenshots()
+
+// Variants modal — opened from the AI step / variants button.
+const variantsOpen = ref(false)
+async function openVariants() {
+  variantsOpen.value = true
+  if (!copyVariants.value.length) await generateCopyVariants()
+}
+function chooseVariant(i: number) {
+  applyVariant(i)
+  variantsOpen.value = false
+}
 
 // Preview-card refs (rendered) — used by the thumbnails strip to scroll
 // to a specific slide. Distinct from `exportRefs` which point at the
@@ -371,6 +384,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       @change="updateConfig"
       @generate="generateCopy"
       @generate-design="generateFullDesign"
+      @extract-colors="extractColorsFromScreenshots"
     />
 
     <!-- Main area -->
@@ -417,6 +431,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               @click="storePreviewOpen = true"
             >
               Store preview
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-shuffle"
+              size="sm"
+              :loading="generating && variantsOpen"
+              :disabled="!!exporting || !config.ai.apiKey"
+              :title="config.ai.apiKey ? 'Generate 3 alternative copy variants for A/B testing' : 'Add an AI key to generate variants'"
+              @click="openVariants"
+            >
+              Variants
             </UButton>
             <UDropdownMenu
               :items="projectMenuItems"
@@ -684,6 +710,98 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             @click="templatePickerOpen = false; templatesDismissed = true"
           >
             Start blank
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Copy variants — A/B test alternative tones. -->
+    <UModal
+      v-model:open="variantsOpen"
+      title="Pick a copy variant"
+      description="Three tone-of-voice variations of your current slides. Choose one to apply, or close to keep the current copy."
+      :ui="{ content: 'sm:max-w-3xl' }"
+    >
+      <template #body>
+        <div
+          v-if="generating && !copyVariants.length"
+          class="flex items-center justify-center py-12 text-sm text-gray-500"
+        >
+          <UIcon
+            name="i-lucide-loader"
+            class="size-4 mr-2 animate-spin"
+          />
+          Generating variants…
+        </div>
+        <div
+          v-else-if="!copyVariants.length"
+          class="py-8 text-center text-sm text-gray-500"
+        >
+          No variants yet.
+          <UButton
+            size="sm"
+            variant="ghost"
+            class="ml-2"
+            @click="generateCopyVariants"
+          >
+            Try again
+          </UButton>
+        </div>
+        <div
+          v-else
+          class="grid grid-cols-1 md:grid-cols-3 gap-3"
+        >
+          <div
+            v-for="(variant, vi) in copyVariants"
+            :key="`variant-${vi}`"
+            class="rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all p-3 flex flex-col gap-2 cursor-pointer bg-white"
+            @click="chooseVariant(vi)"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-gray-500 tracking-wider uppercase">
+                Variant {{ vi + 1 }}
+              </span>
+              <span class="text-[10px] text-gray-400">{{ variant.length }} slides</span>
+            </div>
+            <ul class="space-y-1.5 max-h-[280px] overflow-y-auto">
+              <li
+                v-for="(slide, si) in variant"
+                :key="`v${vi}-s${si}`"
+                class="text-xs"
+              >
+                <span class="font-mono text-gray-400">{{ String(si + 1).padStart(2, '0') }}</span>
+                <span class="text-blue-600 font-bold ml-1">{{ slide.label }}</span>
+                <p class="text-gray-700 mt-0.5 leading-snug whitespace-pre-line">
+                  {{ slide.headline }}
+                </p>
+              </li>
+            </ul>
+            <UButton
+              size="xs"
+              block
+              class="mt-auto"
+              @click.stop="chooseVariant(vi)"
+            >
+              Use this variant
+            </UButton>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex items-center justify-between w-full">
+          <span class="text-[11px] text-gray-400">
+            Existing position fine-tunes are preserved when you pick a variant.
+          </span>
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="ghost"
+            :loading="generating"
+            :disabled="generating || !config.ai.apiKey"
+            icon="i-lucide-refresh-cw"
+            @click="generateCopyVariants"
+          >
+            Regenerate
           </UButton>
         </div>
       </template>

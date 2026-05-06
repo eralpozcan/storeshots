@@ -4,6 +4,35 @@ All notable changes to Storeshots are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project loosely
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-05-06
+
+### Added
+- **Copy variants generator** — new "Variants" button in the toolbar
+  produces three tone-of-voice alternatives of the current slides
+  (confident · warm · punchy) so the user can A/B test direction
+  without re-running the vision pipeline. Picking a variant preserves
+  any per-slide position fine-tunes. Backed by `/api/copy-variants`.
+- **Auto palette from screenshots** — "Auto" wand button on the Style
+  step extracts a brand palette (primary + accent + bg gradient) from
+  the uploaded screenshots via a tiny client-side colour quantiser. No
+  AI key required. Skips near-white / near-black / near-grey buckets
+  so the result reflects real brand colour, not background.
+- **Claude model picker** — Provider step now exposes a model dropdown
+  when Claude is selected: Opus 4.7, Sonnet 4.6, Haiku 4.5, plus the
+  older 3.5 Sonnet / 3.5 Haiku. Choice persists per project and is
+  passed through to every AI endpoint.
+
+### Changed
+- **Sidebar layout unified across every step.** Each wizard step now
+  follows the same shape: a `<header>` with a title, optional right
+  action, and a one-sentence description; field blocks with a
+  consistent `text-xs font-semibold` label and `text-[10px]` helper;
+  every input forced to `w-full` so widths line up flush with the
+  4 px section padding.
+- AI step's two stacked sub-panels (Generate + Settings) now read as
+  one cohesive section with a clear "AI generation" intro followed
+  by a "Provider & key" sub-section.
+
 ## [0.5.0] — 2026-05-06
 
 ### Added
@@ -161,6 +190,7 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
+[0.6.0]: https://github.com/eralpozcan/storeshots/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/eralpozcan/storeshots/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/eralpozcan/storeshots/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/eralpozcan/storeshots/compare/v0.2.2...v0.3.0

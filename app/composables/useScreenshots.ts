@@ -1,5 +1,6 @@
 import type { UserConfig, Device, Orientation, SlideConfig } from '~/utils/types'
 import { loadConfig, saveConfig, DEFAULT_CONFIG } from '~/utils/defaults'
+import { extractPalette } from '~/utils/color-extract'
 import {
   W, H, AW, AH, AT7P_W, AT7P_H, AT7L_W, AT7L_H,
   AT10P_W, AT10P_H, AT10L_W, AT10L_H, IPAD_W, IPAD_H, FGW, FGH,
@@ -155,6 +156,7 @@ export function useScreenshots() {
           provider: config.value.ai.provider,
           apiKey: config.value.ai.apiKey,
           openrouterModel: config.value.ai.openrouterModel,
+          claudeModel: config.value.ai.claudeModel,
           appName: config.value.appName,
           appDescription: config.value.appDescription,
           features: config.value.features,
@@ -191,6 +193,7 @@ export function useScreenshots() {
           provider: config.value.ai.provider,
           apiKey: config.value.ai.apiKey,
           openrouterModel: config.value.ai.openrouterModel,
+          claudeModel: config.value.ai.claudeModel,
           appName: config.value.appName,
           appDescription: config.value.appDescription,
           features: config.value.features,
@@ -208,6 +211,109 @@ export function useScreenshots() {
     }
   }
 
+  // Cached variants from the most recent /api/copy-variants call. Lives only
+  // for the editor session; not persisted to localStorage.
+  const copyVariants = ref<{ label: string, headline: string }[][]>([])
+
+  async function generateCopyVariants() {
+    if (!config.value.ai.apiKey) {
+      toast.add({
+        title: 'API key missing',
+        description: 'Add an OpenRouter or Anthropic API key before generating variants.',
+        color: 'warning',
+        icon: 'i-lucide-key',
+      })
+      return
+    }
+    generating.value = true
+    try {
+      const res = await $fetch<{ variants: { label: string, headline: string }[][] }>(
+        '/api/copy-variants',
+        {
+          method: 'POST',
+          body: {
+            provider: config.value.ai.provider,
+            apiKey: config.value.ai.apiKey,
+            openrouterModel: config.value.ai.openrouterModel,
+          claudeModel: config.value.ai.claudeModel,
+            locale: config.value.locale || 'en',
+            baseCopy: config.value.copy,
+            count: 3,
+          },
+        },
+      )
+      copyVariants.value = res.variants || []
+      toast.add({
+        title: 'Variants ready',
+        description: `${copyVariants.value.length} alternative copy sets generated.`,
+        color: 'success',
+        icon: 'i-lucide-shuffle',
+      })
+    }
+    catch (e: any) {
+      showAIError('Variant generation failed', e)
+    }
+    finally {
+      generating.value = false
+    }
+  }
+
+  function applyVariant(variantIdx: number) {
+    const v = copyVariants.value[variantIdx]
+    if (!v) return
+    // Preserve any per-slide position fine-tunes from the current copy.
+    const merged = v.map((slide, i) => ({
+      ...slide,
+      position: config.value.copy[i]?.position,
+    }))
+    updateConfig({ copy: merged })
+  }
+
+  // Pull dominant brand colours from the uploaded screenshots and apply them
+  // as the slide palette. Pure client-side (canvas + colour quantisation), so
+  // it works without an AI key. Falls back gracefully if the screenshots are
+  // too uniform to extract anything useful.
+  async function extractColorsFromScreenshots() {
+    if (import.meta.server) return
+    const sources = config.value.images.iphone.filter((s): s is string => !!s)
+    if (!sources.length) {
+      toast.add({
+        title: 'No screenshots yet',
+        description: 'Upload at least one screenshot before extracting colours.',
+        color: 'warning',
+        icon: 'i-lucide-image-plus',
+      })
+      return
+    }
+    try {
+      const palette = await extractPalette(sources)
+      if (!palette) {
+        toast.add({
+          title: 'Could not derive a palette',
+          description: 'Screenshots looked too uniform — try editing colours manually.',
+          color: 'warning',
+          icon: 'i-lucide-palette',
+        })
+        return
+      }
+      updateConfig({ colors: palette })
+      toast.add({
+        title: 'Palette extracted',
+        description: 'Brand colours pulled from your screenshots.',
+        color: 'success',
+        icon: 'i-lucide-palette',
+      })
+    }
+    catch (e: any) {
+      toast.add({
+        title: 'Colour extraction failed',
+        description: e?.message || 'Unknown error',
+        color: 'error',
+        icon: 'i-lucide-triangle-alert',
+      })
+    }
+  }
+
   // Versioned project file format. Bump when the schema changes incompatibly.
   const PROJECT_FILE_VERSION = 1
 
@@ -220,7 +326,7 @@ export function useScreenshots() {
       exportedAt: new Date().toISOString(),
       config: {
         ...rest,
-        ai: { provider: ai.provider, openrouterModel: ai.openrouterModel, apiKey: '' },
+        ai: { provider: ai.provider, openrouterModel: ai.openrouterModel, claudeModel: ai.claudeModel, apiKey: '' },
       },
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
@@ -309,5 +415,9 @@ export function useScreenshots() {
     generateFullDesign,
     exportProject,
     importProject,
+    extractColorsFromScreenshots,
+    copyVariants,
+    generateCopyVariants,
+    applyVariant,
   }
 }
