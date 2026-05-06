@@ -4,7 +4,8 @@ import JSZip from 'jszip'
 import type { Device, Orientation } from '~/utils/types'
 import { FGW, FGH, STORE_PRESETS } from '~/utils/canvas'
 import type { StorePreset, PresetTarget } from '~/utils/canvas'
-import { SLIDE_COUNT_APPLE, SLIDE_COUNT_ANDROID } from '~/utils/defaults'
+import { SLIDE_COUNT_APPLE, SLIDE_COUNT_ANDROID, DEFAULT_CONFIG } from '~/utils/defaults'
+import { START_TEMPLATES, type StartTemplate } from '~/utils/templates'
 
 definePageMeta({ layout: false })
 
@@ -34,6 +35,29 @@ function setPreviewRef(i: number, el: any) {
 function scrollToSlide(i: number) {
   const el = previewRefs.value[i]
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+// Quick-start templates. Show the chooser only on a truly fresh editor —
+// detected by the copy still matching the default placeholder. Once the
+// user dismisses or applies a template the picker stays out of the way.
+const templatePickerOpen = ref(false)
+const templatesDismissed = ref(false)
+const isFreshEditor = computed(() => {
+  const c = config.value
+  if (c.copy.some(s => s.headline && s.headline !== 'Your headline\nhere.')) return false
+  if (c.appDescription) return false
+  if (c.features.length) return false
+  return true
+})
+function applyTemplate(t: StartTemplate) {
+  // Apply tone-of-voice fields only — never overwrite user's icon, screenshots, or AI key.
+  updateConfig({
+    colors: t.colors,
+    copy: t.copy,
+    features: t.features,
+  })
+  templatePickerOpen.value = false
+  templatesDismissed.value = true
 }
 
 // Empty-state detection — true when the user hasn't uploaded any screenshots
@@ -282,7 +306,14 @@ const tabletOptions: { label: string; value: Device }[] = [
   { label: 'Android 10"', value: 'android-10' },
 ]
 
-onMounted(() => { ready.value = true })
+onMounted(() => {
+  ready.value = true
+  // First-run hint: open the template chooser unless the user already
+  // started typing or dismissed it before.
+  if (isFreshEditor.value && !templatesDismissed.value) {
+    setTimeout(() => { templatePickerOpen.value = true }, 350)
+  }
+})
 
 // Keyboard shortcuts. Skipped while typing in form fields so they don't
 // fight with regular text editing.
@@ -362,6 +393,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             </span>
           </div>
           <div class="flex items-center gap-2 shrink-0">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-sparkles"
+              size="sm"
+              :disabled="!!exporting"
+              @click="templatePickerOpen = true"
+            >
+              Templates
+            </UButton>
             <UDropdownMenu
               :items="projectMenuItems"
               :disabled="!!exporting"
@@ -585,6 +626,53 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </template>
       </div>
     </div>
+
+    <!-- Quick-start template picker -->
+    <UModal
+      :open="templatePickerOpen"
+      title="Start from a template"
+      description="Pre-fills tone of voice — colours, headlines, and feature bullets. Your icon and screenshots stay untouched."
+      @update:open="(v: boolean) => { templatePickerOpen = v; if (!v) templatesDismissed = true }"
+    >
+      <template #body>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            v-for="t in START_TEMPLATES"
+            :key="t.key"
+            type="button"
+            class="text-left rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all p-4 cursor-pointer bg-white group"
+            @click="applyTemplate(t)"
+          >
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="text-xl leading-none">{{ t.emoji }}</span>
+              <span class="text-sm font-bold text-gray-900 group-hover:text-blue-600">{{ t.label }}</span>
+            </div>
+            <p class="text-xs text-gray-500 leading-relaxed">
+              {{ t.description }}
+            </p>
+            <div class="mt-2.5 flex gap-1">
+              <span
+                v-for="key in ['primary', 'accent', 'bgFrom', 'bgTo'] as const"
+                :key="key"
+                class="size-4 rounded-full border border-white shadow-sm"
+                :style="{ backgroundColor: t.colors[key] }"
+              />
+            </div>
+          </button>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end w-full">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            @click="templatePickerOpen = false; templatesDismissed = true"
+          >
+            Start blank
+          </UButton>
+        </div>
+      </template>
+    </UModal>
 
     <!-- Inline slide-copy editor -->
     <UModal
