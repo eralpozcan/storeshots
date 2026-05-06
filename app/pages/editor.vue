@@ -4,7 +4,8 @@ import JSZip from 'jszip'
 import type { Device, Orientation } from '~/utils/types'
 import { FGW, FGH, STORE_PRESETS } from '~/utils/canvas'
 import type { StorePreset, PresetTarget } from '~/utils/canvas'
-import { SLIDE_COUNT_APPLE, SLIDE_COUNT_ANDROID } from '~/utils/defaults'
+import { SLIDE_COUNT_APPLE, SLIDE_COUNT_ANDROID, DEFAULT_CONFIG } from '~/utils/defaults'
+import { START_TEMPLATES, type StartTemplate } from '~/utils/templates'
 
 definePageMeta({ layout: false })
 
@@ -23,6 +24,53 @@ const {
   updateConfig, generateCopy, generateFullDesign,
   exportProject, importProject,
 } = useScreenshots()
+
+// Preview-card refs (rendered) — used by the thumbnails strip to scroll
+// to a specific slide. Distinct from `exportRefs` which point at the
+// offscreen full-size capture targets.
+const previewRefs = ref<(HTMLElement | null)[]>([])
+function setPreviewRef(i: number, el: any) {
+  previewRefs.value[i] = el as HTMLElement | null
+}
+function scrollToSlide(i: number) {
+  const el = previewRefs.value[i]
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+// Quick-start templates. Show the chooser only on a truly fresh editor —
+// detected by the copy still matching the default placeholder. Once the
+// user dismisses or applies a template the picker stays out of the way.
+const templatePickerOpen = ref(false)
+const templatesDismissed = ref(false)
+const isFreshEditor = computed(() => {
+  const c = config.value
+  if (c.copy.some(s => s.headline && s.headline !== 'Your headline\nhere.')) return false
+  if (c.appDescription) return false
+  if (c.features.length) return false
+  return true
+})
+// App Store preview — simulates how the first 3 slides look in a real
+// iOS App Store listing (above-the-fold).
+const storePreviewOpen = ref(false)
+
+function applyTemplate(t: StartTemplate) {
+  // Apply tone-of-voice fields only — never overwrite user's icon, screenshots, or AI key.
+  updateConfig({
+    colors: t.colors,
+    copy: t.copy,
+    features: t.features,
+  })
+  templatePickerOpen.value = false
+  templatesDismissed.value = true
+}
+
+// Empty-state detection — true when the user hasn't uploaded any screenshots
+// at all yet. Drives a friendly banner over the slide grid that points back
+// to the Screenshots step.
+const hasAnyImages = computed(() => {
+  const imgs = config.value.images
+  return Object.values(imgs).some(arr => arr.some(Boolean))
+})
 
 // Inline slide-copy editor — open via the pencil overlay on each SlideCard.
 const editingSlide = ref<number | null>(null)
@@ -262,7 +310,44 @@ const tabletOptions: { label: string; value: Device }[] = [
   { label: 'Android 10"', value: 'android-10' },
 ]
 
-onMounted(() => { ready.value = true })
+onMounted(() => {
+  ready.value = true
+  // First-run hint: open the template chooser unless the user already
+  // started typing or dismissed it before.
+  if (isFreshEditor.value && !templatesDismissed.value) {
+    setTimeout(() => { templatePickerOpen.value = true }, 350)
+  }
+})
+
+// Keyboard shortcuts. Skipped while typing in form fields so they don't
+// fight with regular text editing.
+function isTyping(t: EventTarget | null) {
+  const el = t as HTMLElement | null
+  if (!el) return false
+  const tag = el.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (isTyping(e.target)) return
+  const meta = e.metaKey || e.ctrlKey
+  if (meta && e.key.toLowerCase() === 'e') {
+    e.preventDefault()
+    if (!exporting.value) exportAll()
+    return
+  }
+  if (meta && e.key.toLowerCase() === 'g') {
+    e.preventDefault()
+    if (!generating.value && config.value.ai.apiKey) generateCopy()
+    return
+  }
+  if (e.key === 'Escape') {
+    if (editingSlide.value !== null) editingSlide.value = null
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
@@ -312,6 +397,27 @@ onMounted(() => { ready.value = true })
             </span>
           </div>
           <div class="flex items-center gap-2 shrink-0">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-sparkles"
+              size="sm"
+              :disabled="!!exporting"
+              @click="templatePickerOpen = true"
+            >
+              Templates
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-store"
+              size="sm"
+              :disabled="!!exporting || device !== 'iphone'"
+              :title="device !== 'iphone' ? 'Switch to iPhone to preview' : 'See how the first 3 slides look in the App Store'"
+              @click="storePreviewOpen = true"
+            >
+              Store preview
+            </UButton>
             <UDropdownMenu
               :items="projectMenuItems"
               :disabled="!!exporting"
@@ -460,21 +566,59 @@ onMounted(() => { ready.value = true })
 
         <!-- Slide grid -->
         <template v-else>
+          <!-- Empty-state hint: shown until the user uploads their first screenshot. -->
+          <div
+            v-if="!hasAnyImages"
+            class="mx-auto max-w-[1100px] mt-6 mx-6 rounded-xl border border-dashed border-blue-300 bg-blue-50/50 px-5 py-4 flex items-center gap-3"
+          >
+            <UIcon
+              name="i-lucide-image-plus"
+              class="size-5 text-blue-600 shrink-0"
+            />
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-blue-900">
+                Add your first screenshot to bring slides to life
+              </p>
+              <p class="text-xs text-blue-700/80 mt-0.5">
+                Slides below are placeholders. Open the
+                <span class="font-semibold">Screenshots</span> step in the sidebar to upload.
+              </p>
+            </div>
+          </div>
+          <!-- Thumbnails strip — quick visual index of every slide. Click to jump. -->
+          <div class="sticky top-0 z-20 bg-gray-100/85 backdrop-blur border-b border-gray-200 px-6 py-2 flex gap-1.5 overflow-x-auto">
+            <button
+              v-for="(v, i) in slideVariants"
+              :key="`thumb-${i}`"
+              class="shrink-0 px-2.5 py-1 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors flex items-center gap-1.5"
+              :class="config.copy[i]?.label ? 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-600' : 'border-gray-200 bg-white/60 text-gray-400 hover:text-gray-600'"
+              :title="`Jump to slide ${i + 1}`"
+              @click="scrollToSlide(i)"
+            >
+              <span class="text-gray-400 font-mono">{{ String(i + 1).padStart(2, '0') }}</span>
+              <span class="truncate max-w-[110px]">{{ config.copy[i]?.label || `Slide ${i + 1}` }}</span>
+            </button>
+          </div>
+
           <div class="p-6 grid grid-cols-3 gap-6 max-w-[1100px] mx-auto">
-            <SlideCard
+            <div
               v-for="(v, i) in slideVariants"
               :key="`${device}-${orientation}-${i}`"
-              :index="i"
-              :variant="v"
-              :cfg="slideConfig"
-              :c-w="canvasDims.cW"
-              :c-h="canvasDims.cH"
-              :label="config.copy[i]?.label || `Slide ${i + 1}`"
-              :device-frame="deviceFrame"
-              @export="exportOne(i)"
-              @edit="openEdit(i)"
-              @position="(v: { dx: number, dy: number } | null) => setSlidePosition(i, v)"
-            />
+              :ref="(el) => setPreviewRef(i, el)"
+            >
+              <SlideCard
+                :index="i"
+                :variant="v"
+                :cfg="slideConfig"
+                :c-w="canvasDims.cW"
+                :c-h="canvasDims.cH"
+                :label="config.copy[i]?.label || `Slide ${i + 1}`"
+                :device-frame="deviceFrame"
+                @export="exportOne(i)"
+                @edit="openEdit(i)"
+                @position="(v: { dx: number, dy: number } | null) => setSlidePosition(i, v)"
+              />
+            </div>
           </div>
 
           <!-- Offscreen export targets -->
@@ -497,6 +641,125 @@ onMounted(() => { ready.value = true })
         </template>
       </div>
     </div>
+
+    <!-- Quick-start template picker -->
+    <UModal
+      :open="templatePickerOpen"
+      title="Start from a template"
+      description="Pre-fills tone of voice — colours, headlines, and feature bullets. Your icon and screenshots stay untouched."
+      @update:open="(v: boolean) => { templatePickerOpen = v; if (!v) templatesDismissed = true }"
+    >
+      <template #body>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            v-for="t in START_TEMPLATES"
+            :key="t.key"
+            type="button"
+            class="text-left rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all p-4 cursor-pointer bg-white group"
+            @click="applyTemplate(t)"
+          >
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="text-xl leading-none">{{ t.emoji }}</span>
+              <span class="text-sm font-bold text-gray-900 group-hover:text-blue-600">{{ t.label }}</span>
+            </div>
+            <p class="text-xs text-gray-500 leading-relaxed">
+              {{ t.description }}
+            </p>
+            <div class="mt-2.5 flex gap-1">
+              <span
+                v-for="key in ['primary', 'accent', 'bgFrom', 'bgTo'] as const"
+                :key="key"
+                class="size-4 rounded-full border border-white shadow-sm"
+                :style="{ backgroundColor: t.colors[key] }"
+              />
+            </div>
+          </button>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end w-full">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            @click="templatePickerOpen = false; templatesDismissed = true"
+          >
+            Start blank
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- App Store preview — what the first 3 slides look like above-the-fold. -->
+    <UModal
+      v-model:open="storePreviewOpen"
+      title="App Store preview"
+      description="A rough simulation of the listing row most users see first."
+      :ui="{ content: 'sm:max-w-2xl' }"
+    >
+      <template #body>
+        <div class="rounded-2xl bg-white p-5">
+          <!-- App identity row -->
+          <div class="flex items-start gap-3 mb-5">
+            <div class="size-16 rounded-2xl overflow-hidden shrink-0 border border-gray-200 bg-gray-50">
+              <img
+                v-if="config.appIcon"
+                :src="config.appIcon"
+                alt=""
+                class="w-full h-full object-cover"
+              >
+              <div
+                v-else
+                class="w-full h-full flex items-center justify-center text-2xl text-gray-300"
+              >
+                ?
+              </div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-base font-bold text-gray-900 leading-tight truncate">
+                {{ config.appName || 'Your App' }}
+              </div>
+              <div class="text-xs text-gray-500 mt-0.5 truncate">
+                {{ config.appDescription ? config.appDescription.split(/[.!?]/)[0] : 'Your tagline goes here' }}
+              </div>
+              <div class="mt-2 inline-flex px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-bold">
+                Get
+              </div>
+            </div>
+          </div>
+
+          <!-- First 3 slides row, iOS-style -->
+          <div class="flex gap-2 overflow-x-auto pb-1">
+            <div
+              v-for="i in [0, 1, 2]"
+              :key="`store-preview-${i}`"
+              class="shrink-0 w-[140px] rounded-xl overflow-hidden border border-gray-200"
+              :style="{ aspectRatio: `${canvasDims.cW}/${canvasDims.cH}` }"
+            >
+              <div
+                class="origin-top-left"
+                :style="{
+                  width: `${canvasDims.cW}px`,
+                  height: `${canvasDims.cH}px`,
+                  transform: `scale(${140 / canvasDims.cW})`,
+                }"
+              >
+                <SlideTemplate
+                  :variant="i + 1"
+                  :cfg="slideConfig"
+                  :c-w="canvasDims.cW"
+                  :c-h="canvasDims.cH"
+                  :device-frame="deviceFrame"
+                />
+              </div>
+            </div>
+          </div>
+
+          <p class="mt-4 text-[11px] text-gray-400 leading-relaxed">
+            iOS users see the first 3 slides without scrolling. Make sure the strongest hook is in slide 1, the most-used feature in slide 2, and a differentiator or social proof in slide 3.
+          </p>
+        </div>
+      </template>
+    </UModal>
 
     <!-- Inline slide-copy editor -->
     <UModal

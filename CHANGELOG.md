@@ -4,6 +4,25 @@ All notable changes to Storeshots are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project loosely
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-05-06
+
+### Added
+- **Quick-start templates** — a chooser auto-opens on a fresh editor and is
+  reachable any time from the new "Templates" button. Four presets (SaaS,
+  Game, Finance, Health) pre-fill colours, slide copy, and key features.
+  User assets (icon, screenshots, AI key) are never overwritten.
+- **App Store preview** — a "Store preview" button (active on iPhone)
+  opens a modal that simulates the listing row users see first: app
+  icon + name + tagline + the first 3 slides at iOS-row aspect ratio.
+- **Sticky thumbnails strip** above the slide grid, one chip per slide.
+  Click a chip to jump the preview to that slide.
+- **Empty-state hint** — when no screenshots have been uploaded yet,
+  a banner above the slide grid points the user back to the Screenshots
+  step instead of leaving them confused by placeholder previews.
+- **Keyboard shortcuts** — `⌘/Ctrl + E` exports all, `⌘/Ctrl + G`
+  generates copy via AI, `Esc` closes the slide-edit modal. All
+  shortcuts skip while typing in form fields.
+
 ## [0.4.0] — 2026-05-06
 
 ### Added
@@ -142,6 +161,7 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
+[0.5.0]: https://github.com/eralpozcan/storeshots/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/eralpozcan/storeshots/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/eralpozcan/storeshots/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/eralpozcan/storeshots/compare/v0.2.1...v0.2.2
