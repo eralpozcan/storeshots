@@ -271,6 +271,36 @@ const tabletOptions: { label: string; value: Device }[] = [
 ]
 
 onMounted(() => { ready.value = true })
+
+// Keyboard shortcuts. Skipped while typing in form fields so they don't
+// fight with regular text editing.
+function isTyping(t: EventTarget | null) {
+  const el = t as HTMLElement | null
+  if (!el) return false
+  const tag = el.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (isTyping(e.target)) return
+  const meta = e.metaKey || e.ctrlKey
+  if (meta && e.key.toLowerCase() === 'e') {
+    e.preventDefault()
+    if (!exporting.value) exportAll()
+    return
+  }
+  if (meta && e.key.toLowerCase() === 'g') {
+    e.preventDefault()
+    if (!generating.value && config.value.ai.apiKey) generateCopy()
+    return
+  }
+  if (e.key === 'Escape') {
+    if (editingSlide.value !== null) editingSlide.value = null
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
