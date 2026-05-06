@@ -49,6 +49,10 @@ const isFreshEditor = computed(() => {
   if (c.features.length) return false
   return true
 })
+// App Store preview — simulates how the first 3 slides look in a real
+// iOS App Store listing (above-the-fold).
+const storePreviewOpen = ref(false)
+
 function applyTemplate(t: StartTemplate) {
   // Apply tone-of-voice fields only — never overwrite user's icon, screenshots, or AI key.
   updateConfig({
@@ -403,6 +407,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             >
               Templates
             </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-store"
+              size="sm"
+              :disabled="!!exporting || device !== 'iphone'"
+              :title="device !== 'iphone' ? 'Switch to iPhone to preview' : 'See how the first 3 slides look in the App Store'"
+              @click="storePreviewOpen = true"
+            >
+              Store preview
+            </UButton>
             <UDropdownMenu
               :items="projectMenuItems"
               :disabled="!!exporting"
@@ -670,6 +685,78 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           >
             Start blank
           </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- App Store preview — what the first 3 slides look like above-the-fold. -->
+    <UModal
+      v-model:open="storePreviewOpen"
+      title="App Store preview"
+      description="A rough simulation of the listing row most users see first."
+      :ui="{ content: 'sm:max-w-2xl' }"
+    >
+      <template #body>
+        <div class="rounded-2xl bg-white p-5">
+          <!-- App identity row -->
+          <div class="flex items-start gap-3 mb-5">
+            <div class="size-16 rounded-2xl overflow-hidden shrink-0 border border-gray-200 bg-gray-50">
+              <img
+                v-if="config.appIcon"
+                :src="config.appIcon"
+                alt=""
+                class="w-full h-full object-cover"
+              >
+              <div
+                v-else
+                class="w-full h-full flex items-center justify-center text-2xl text-gray-300"
+              >
+                ?
+              </div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-base font-bold text-gray-900 leading-tight truncate">
+                {{ config.appName || 'Your App' }}
+              </div>
+              <div class="text-xs text-gray-500 mt-0.5 truncate">
+                {{ config.appDescription ? config.appDescription.split(/[.!?]/)[0] : 'Your tagline goes here' }}
+              </div>
+              <div class="mt-2 inline-flex px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-bold">
+                Get
+              </div>
+            </div>
+          </div>
+
+          <!-- First 3 slides row, iOS-style -->
+          <div class="flex gap-2 overflow-x-auto pb-1">
+            <div
+              v-for="i in [0, 1, 2]"
+              :key="`store-preview-${i}`"
+              class="shrink-0 w-[140px] rounded-xl overflow-hidden border border-gray-200"
+              :style="{ aspectRatio: `${canvasDims.cW}/${canvasDims.cH}` }"
+            >
+              <div
+                class="origin-top-left"
+                :style="{
+                  width: `${canvasDims.cW}px`,
+                  height: `${canvasDims.cH}px`,
+                  transform: `scale(${140 / canvasDims.cW})`,
+                }"
+              >
+                <SlideTemplate
+                  :variant="i + 1"
+                  :cfg="slideConfig"
+                  :c-w="canvasDims.cW"
+                  :c-h="canvasDims.cH"
+                  :device-frame="deviceFrame"
+                />
+              </div>
+            </div>
+          </div>
+
+          <p class="mt-4 text-[11px] text-gray-400 leading-relaxed">
+            iOS users see the first 3 slides without scrolling. Make sure the strongest hook is in slide 1, the most-used feature in slide 2, and a differentiator or social proof in slide 3.
+          </p>
         </div>
       </template>
     </UModal>
