@@ -1,6 +1,9 @@
 export type SlideCopy = {
   label: string
   headline: string // use \n for line breaks
+  // Optional caption translation in canvas pixels, relative to the slide's
+  // default caption position. Set via the in-card "Adjust position" mode.
+  position?: { dx: number, dy: number }
 }
 
 export type BrandColors = {

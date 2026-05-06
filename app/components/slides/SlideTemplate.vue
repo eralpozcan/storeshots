@@ -9,6 +9,8 @@ const props = defineProps<{
   cW: number
   cH: number
   deviceFrame: 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad'
+  // Live drag preview from SlideCard's adjust mode. Wins over copy.position.
+  positionOverride?: { dx: number, dy: number } | null
 }>()
 
 function imgSrc(v: string | null | undefined) { return v || PLACEHOLDER_IMG }
@@ -56,6 +58,14 @@ const captionPos = computed(() => {
   if (props.variant === 3 || props.variant === 8) return 'bottom-left'
   return 'top'
 })
+
+// User fine-tune offset, applied as an extra transform on the caption wrapper.
+// Falls back to the value persisted on the slide's copy entry.
+const captionTransform = computed(() => {
+  const p = props.positionOverride ?? copy.value.position ?? null
+  if (!p || (p.dx === 0 && p.dy === 0)) return undefined
+  return `translate(${p.dx}px, ${p.dy}px)`
+})
 </script>
 
 <template>
@@ -82,7 +92,7 @@ const captionPos = computed(() => {
       }"
       draggable="false"
     >
-    <div :style="{ textAlign: 'center', position: 'relative', zIndex: 5, padding: `0 ${cW * 0.1}px` }">
+    <div :style="{ textAlign: 'center', position: 'relative', zIndex: 5, padding: `0 ${cW * 0.1}px`, transform: captionTransform }">
       <SlideCaption :label="copy.label" :headline="copy.headline" :text-color="c.textLight" :label-color="c.accent" :c-w="cW" />
     </div>
     <div :style="{ position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)', width: `${cW * 0.14}px`, height: '3px', background: `linear-gradient(90deg,${c.primary},${c.accent})`, borderRadius: '2px', zIndex: 5 }" />
@@ -119,13 +129,13 @@ const captionPos = computed(() => {
     <!-- Caption -->
     <div
       v-if="captionPos === 'top'"
-      :style="{ position: 'absolute', top: '6%', left: '10%', right: '10%', zIndex: 10 }"
+      :style="{ position: 'absolute', top: '6%', left: '10%', right: '10%', zIndex: 10, transform: captionTransform }"
     >
       <SlideCaption :label="copy.label" :headline="copy.headline" :text-color="textColor" :label-color="c.accent" :c-w="cW" />
     </div>
     <div
       v-else
-      :style="{ position: 'absolute', bottom: cH > 2400 ? '10%' : '8%', left: '8%', right: '46%', zIndex: 10 }"
+      :style="{ position: 'absolute', bottom: cH > 2400 ? '10%' : '8%', left: '8%', right: '46%', zIndex: 10, transform: captionTransform }"
     >
       <SlideCaption :label="copy.label" :headline="copy.headline" :text-color="textColor" :label-color="c.accent" :c-w="cW" />
     </div>
