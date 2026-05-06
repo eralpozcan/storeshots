@@ -21,8 +21,43 @@ function setSsRef(idx: number, el: any) {
   if (el) ssInputRefs.value[idx] = el as HTMLInputElement
 }
 
+// Wizard step. Default to step 1 if no images, otherwise jump to Headlines.
+const activeStep = ref(1)
+const STEPS = [
+  { id: 1, label: 'Basics', icon: 'i-lucide-info' },
+  { id: 2, label: 'Screenshots', icon: 'i-lucide-image' },
+  { id: 3, label: 'AI', icon: 'i-lucide-sparkles' },
+  { id: 4, label: 'Headlines', icon: 'i-lucide-type' },
+  { id: 5, label: 'Style', icon: 'i-lucide-palette' },
+] as const
+
 // Screenshot device tabs
 const activeDevice = ref<ImagesKey>('iphone')
+
+// Features chip-input draft. Press Enter to commit a chip, click ✕ to remove.
+const featureDraft = ref('')
+function addFeature() {
+  const v = featureDraft.value.trim()
+  if (!v) return
+  if (props.config.features.includes(v)) {
+    featureDraft.value = ''
+    return
+  }
+  emit('change', { features: [...props.config.features, v] })
+  featureDraft.value = ''
+}
+function removeFeature(idx: number) {
+  emit('change', { features: props.config.features.filter((_, i) => i !== idx) })
+}
+
+// Per-step completion hints — purely cosmetic checkmarks in the step nav.
+const stepDone = computed(() => ({
+  1: !!props.config.appName && !!props.config.appDescription,
+  2: Object.values(props.config.images).some(arr => arr.some(Boolean)),
+  3: !!props.config.ai.apiKey,
+  4: props.config.copy.some(c => c.headline && c.headline !== 'Your headline\nhere.'),
+  5: !!props.config.colors.primary,
+}))
 
 const DEVICE_LABELS: { key: ImagesKey; label: string }[] = [
   { key: 'iphone', label: 'iPhone' },
@@ -204,26 +239,74 @@ function handleReset() {
 </script>
 
 <template>
-  <div class="w-[280px] shrink-0 bg-white border-r border-gray-200 overflow-y-auto h-screen">
+  <div class="w-[280px] shrink-0 bg-white border-r border-gray-200 overflow-y-auto h-screen flex flex-col">
+    <!-- Wizard step nav — single-open accordion driven from the top. -->
+    <div class="sticky top-0 z-10 bg-white border-b border-gray-200 px-3 py-2.5 grid grid-cols-5 gap-1">
+      <button
+        v-for="s in STEPS"
+        :key="s.id"
+        class="flex flex-col items-center gap-0.5 py-1.5 rounded-md cursor-pointer transition-colors"
+        :class="activeStep === s.id ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'"
+        :title="s.label"
+        @click="activeStep = s.id"
+      >
+        <div class="relative">
+          <UIcon
+            :name="s.icon"
+            class="size-4"
+          />
+          <span
+            v-if="stepDone[s.id]"
+            class="absolute -top-1 -right-1 size-2 rounded-full bg-green-500 ring-1 ring-white"
+          />
+        </div>
+        <span class="text-[10px] font-semibold leading-none">{{ s.label }}</span>
+      </button>
+    </div>
+
     <!-- App Info -->
-    <div class="border-b border-gray-200 p-4">
-      <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase mb-3">
-        App Info
-      </div>
-      <div class="flex gap-2.5 items-start mb-2.5">
+    <div
+      v-show="activeStep === 1"
+      class="border-b border-gray-200 p-4 space-y-4"
+    >
+      <!-- Icon dropzone -->
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">
+          App icon
+        </label>
         <div
-          class="w-14 h-14 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 cursor-pointer flex items-center justify-center overflow-hidden shrink-0 relative"
+          class="relative w-full h-24 rounded-lg border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden bg-gray-50"
+          :class="config.appIcon ? 'border-transparent bg-white' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/40'"
           @click="iconInputRef?.click()"
           @dragover.prevent
           @drop="onIconDrop"
         >
-          <img
-            v-if="config.appIcon"
-            :src="config.appIcon"
-            alt="Icon"
-            class="w-full h-full object-cover"
-          >
-          <span v-else class="text-lg text-gray-400">+</span>
+          <template v-if="config.appIcon">
+            <img
+              :src="config.appIcon"
+              alt="App icon"
+              class="w-16 h-16 rounded-xl object-cover shadow-sm"
+            >
+            <button
+              type="button"
+              class="absolute top-1.5 right-1.5 size-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black"
+              title="Remove icon"
+              @click.stop="emit('change', { appIcon: null })"
+            >
+              <UIcon
+                name="i-lucide-x"
+                class="size-3.5"
+              />
+            </button>
+          </template>
+          <template v-else>
+            <UIcon
+              name="i-lucide-image-plus"
+              class="size-6 text-gray-400 mb-1"
+            />
+            <span class="text-[11px] text-gray-500">Click or drop</span>
+            <span class="text-[10px] text-gray-400">PNG · 1024×1024</span>
+          </template>
           <input
             ref="iconInputRef"
             type="file"
@@ -232,44 +315,93 @@ function handleReset() {
             @change="onIconSelect"
           >
         </div>
-        <div class="flex-1">
-          <div class="text-xs font-semibold text-gray-700 mb-1">
-            App Name
-          </div>
-          <UInput
-            :model-value="config.appName"
-            size="sm"
-            placeholder="My App"
-            @update:model-value="emit('change', { appName: $event as string })"
-          />
-        </div>
       </div>
-      <div class="text-xs font-semibold text-gray-700 mb-1">
-        Description <span class="font-normal text-gray-400">(for AI)</span>
+
+      <!-- App name -->
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">
+          App name
+        </label>
+        <UInput
+          :model-value="config.appName"
+          size="sm"
+          placeholder="My App"
+          class="w-full"
+          @update:model-value="emit('change', { appName: $event as string })"
+        />
       </div>
-      <UTextarea
-        :model-value="config.appDescription"
-        :rows="3"
-        size="sm"
-        placeholder="What does your app do?"
-        @update:model-value="emit('change', { appDescription: $event as string })"
-      />
-      <div class="mt-2">
-        <div class="text-xs font-semibold text-gray-700 mb-1">
-          Features <span class="font-normal text-gray-400">(one per line)</span>
+
+      <!-- Description -->
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-xs font-semibold text-gray-700">
+            Description
+          </label>
+          <span class="text-[10px] text-gray-400">{{ config.appDescription.length }} / 600</span>
         </div>
         <UTextarea
-          :model-value="config.features.join('\n')"
+          :model-value="config.appDescription"
           :rows="4"
           size="sm"
-          placeholder="Rent tracking&#10;Tenant management"
-          @update:model-value="emit('change', { features: ($event as string).split('\n').map((f: string) => f.trim()).filter(Boolean) })"
+          placeholder="One sentence about what your app does."
+          maxlength="600"
+          class="w-full"
+          :ui="{ base: 'w-full' }"
+          @update:model-value="emit('change', { appDescription: $event as string })"
         />
+      </div>
+
+      <!-- Features (chip input) -->
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-xs font-semibold text-gray-700">
+            Key features
+          </label>
+          <span class="text-[10px] text-gray-400">{{ config.features.length }} added</span>
+        </div>
+        <div
+          v-if="config.features.length"
+          class="flex flex-wrap gap-1.5 mb-2"
+        >
+          <span
+            v-for="(f, i) in config.features"
+            :key="`${f}-${i}`"
+            class="inline-flex items-center gap-1 max-w-full px-2 py-1 rounded-full bg-blue-50 text-blue-700 text-xs"
+          >
+            <span class="truncate">{{ f }}</span>
+            <button
+              type="button"
+              class="shrink-0 hover:text-blue-900"
+              :aria-label="`Remove ${f}`"
+              @click="removeFeature(i)"
+            >
+              <UIcon
+                name="i-lucide-x"
+                class="size-3"
+              />
+            </button>
+          </span>
+        </div>
+        <UInput
+          v-model="featureDraft"
+          size="sm"
+          placeholder="Add feature, Enter to save"
+          icon="i-lucide-plus"
+          class="w-full"
+          @keydown.enter.prevent="addFeature"
+          @keydown.comma.prevent="addFeature"
+        />
+        <p class="mt-1 text-[10px] text-gray-400">
+          Press Enter or comma to add a chip.
+        </p>
       </div>
     </div>
 
     <!-- Brand Colors -->
-    <div class="border-b border-gray-200 p-4">
+    <div
+      v-show="activeStep === 5"
+      class="border-b border-gray-200 p-4"
+    >
       <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase mb-3">
         Brand Colors
       </div>
@@ -306,7 +438,10 @@ function handleReset() {
     </div>
 
     <!-- Screenshots -->
-    <div class="border-b border-gray-200 p-4">
+    <div
+      v-show="activeStep === 2"
+      class="border-b border-gray-200 p-4"
+    >
       <div class="flex items-center justify-between mb-3">
         <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase">
           Screenshots
@@ -389,7 +524,10 @@ function handleReset() {
     </div>
 
     <!-- AI Generate -->
-    <div class="border-b border-gray-200 p-4">
+    <div
+      v-show="activeStep === 3"
+      class="border-b border-gray-200 p-4"
+    >
       <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase mb-3">
         AI Generate
       </div>
@@ -457,8 +595,20 @@ function handleReset() {
           <b>✦ Full Design</b> — copy + brand colors from your screenshots
         </div>
       </div>
-      <!-- Slide copy list header -->
-      <div class="flex items-center justify-between mb-2">
+    </div>
+
+    <!-- Slide copy list (Headlines step) -->
+    <div
+      v-show="activeStep === 4"
+      class="border-b border-gray-200 p-4"
+    >
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase">
+          Slide Headlines
+        </div>
+        <span class="text-[10px] text-gray-400">drag to reorder</span>
+      </div>
+      <div class="flex items-center justify-between mb-2 hidden">
         <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase">
           Slides
         </div>
@@ -523,7 +673,10 @@ function handleReset() {
     </div>
 
     <!-- AI Settings -->
-    <div class="border-b border-gray-200 p-4">
+    <div
+      v-show="activeStep === 3"
+      class="border-b border-gray-200 p-4"
+    >
       <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase mb-3">
         AI Settings
       </div>

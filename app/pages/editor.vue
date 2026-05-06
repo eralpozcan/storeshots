@@ -24,6 +24,36 @@ const {
   exportProject, importProject,
 } = useScreenshots()
 
+// Inline slide-copy editor — open via the pencil overlay on each SlideCard.
+const editingSlide = ref<number | null>(null)
+const editingDraft = ref<{ label: string, headline: string }>({ label: '', headline: '' })
+function openEdit(i: number) {
+  const slide = config.value.copy[i]
+  editingDraft.value = { label: slide?.label || '', headline: slide?.headline || '' }
+  editingSlide.value = i
+}
+function saveEdit() {
+  if (editingSlide.value == null) return
+  const next = [...config.value.copy]
+  // Preserve any existing fine-tune position when overwriting label/headline.
+  next[editingSlide.value] = { ...next[editingSlide.value], ...editingDraft.value }
+  updateConfig({ copy: next })
+  editingSlide.value = null
+}
+
+function setSlidePosition(i: number, value: { dx: number, dy: number } | null) {
+  const next = [...config.value.copy]
+  const current = next[i] || { label: '', headline: '' }
+  if (value === null) {
+    const { position, ...rest } = current
+    next[i] = rest
+  }
+  else {
+    next[i] = { ...current, position: value }
+  }
+  updateConfig({ copy: next })
+}
+
 // Hidden file input wired to importProject
 const importInputRef = ref<HTMLInputElement | null>(null)
 function triggerImport() { importInputRef.value?.click() }
@@ -260,25 +290,75 @@ onMounted(() => { ready.value = true })
 
     <!-- Main area -->
     <div class="flex-1 flex flex-col overflow-hidden relative">
-      <!-- Toolbar -->
-      <div class="shrink-0 bg-white border-b border-gray-200 flex items-center z-50">
-        <div class="flex-1 flex items-center gap-2.5 px-4 py-2.5 overflow-x-auto min-w-0">
-          <NuxtLink
-            to="/"
-            class="flex items-center gap-2 pr-3 mr-1 border-r border-gray-200 text-gray-600 hover:text-blue-600 shrink-0"
-            aria-label="Back to home"
-          >
-            <UIcon
-              name="i-lucide-arrow-left"
-              class="size-4"
-            />
-            <span class="text-xs font-semibold">Home</span>
-          </NuxtLink>
+      <!-- Toolbar — two rows: actions on top, device controls below. -->
+      <div class="shrink-0 bg-white border-b border-gray-200 z-50">
+        <!-- Row 1: identity + project actions -->
+        <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+          <div class="flex items-center gap-3 min-w-0">
+            <NuxtLink
+              to="/"
+              class="flex items-center gap-2 text-gray-600 hover:text-blue-600 shrink-0"
+              aria-label="Back to home"
+            >
+              <UIcon
+                name="i-lucide-arrow-left"
+                class="size-4"
+              />
+              <span class="text-xs font-semibold">Home</span>
+            </NuxtLink>
+            <span class="text-gray-300">·</span>
+            <span class="font-bold text-sm text-gray-900 whitespace-nowrap truncate">
+              {{ config.appName || 'My App' }}
+            </span>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <UDropdownMenu
+              :items="projectMenuItems"
+              :disabled="!!exporting"
+            >
+              <UButton
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-folder"
+                size="sm"
+                :disabled="!!exporting"
+              >
+                Project
+              </UButton>
+            </UDropdownMenu>
+            <input
+              ref="importInputRef"
+              type="file"
+              accept="application/json,.json,.storeshots.json"
+              class="hidden"
+              @change="onImportFile"
+            >
+            <UButton
+              size="sm"
+              :loading="!!exporting"
+              :disabled="!!exporting"
+              @click="exportAll"
+            >
+              {{ exporting ? `Exporting… ${exporting}` : 'Export All' }}
+            </UButton>
+            <UDropdownMenu
+              :items="presetMenuItems"
+              :disabled="!!exporting || device === 'feature-graphic'"
+            >
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-package"
+                :disabled="!!exporting || device === 'feature-graphic'"
+              >
+                Bundle
+              </UButton>
+            </UDropdownMenu>
+          </div>
+        </div>
 
-          <span class="font-bold text-sm text-gray-900 whitespace-nowrap">
-            {{ config.appName || 'My App' }} · Screenshots
-          </span>
-
+        <!-- Row 2: device + size controls -->
+        <div class="flex items-center gap-2.5 px-4 py-2 overflow-x-auto">
           <!-- Device tabs -->
           <div class="flex gap-1 bg-gray-100 rounded-lg p-1 items-center shrink-0">
             <button
@@ -344,52 +424,6 @@ onMounted(() => { ready.value = true })
             </option>
           </select>
         </div>
-
-        <!-- Project + Export buttons -->
-        <div class="shrink-0 flex items-stretch border-l border-gray-200 bg-white">
-          <div class="px-4 py-2.5 flex items-center gap-2">
-            <UDropdownMenu
-              :items="projectMenuItems"
-              :disabled="!!exporting"
-            >
-              <UButton
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-folder"
-                :disabled="!!exporting"
-              >
-                Project
-              </UButton>
-            </UDropdownMenu>
-            <input
-              ref="importInputRef"
-              type="file"
-              accept="application/json,.json,.storeshots.json"
-              class="hidden"
-              @change="onImportFile"
-            >
-            <UButton
-              :loading="!!exporting"
-              :disabled="!!exporting"
-              @click="exportAll"
-            >
-              {{ exporting ? `Exporting… ${exporting}` : 'Export All' }}
-            </UButton>
-            <UDropdownMenu
-              :items="presetMenuItems"
-              :disabled="!!exporting || device === 'feature-graphic'"
-            >
-              <UButton
-                color="neutral"
-                variant="outline"
-                icon="i-lucide-package"
-                :disabled="!!exporting || device === 'feature-graphic'"
-              >
-                Bundle
-              </UButton>
-            </UDropdownMenu>
-          </div>
-        </div>
       </div>
 
       <!-- Preview area -->
@@ -399,13 +433,21 @@ onMounted(() => { ready.value = true })
           v-if="device === 'feature-graphic'"
           class="p-6"
         >
-          <p class="text-xs text-gray-500 mb-4">
-            Google Play Feature Graphic · 1024×500 · Click to export
-          </p>
-          <div
-            class="inline-block cursor-pointer rounded-xl overflow-hidden shadow-lg"
-            @click="exportFG"
-          >
+          <div class="flex items-center justify-between mb-4">
+            <p class="text-xs text-gray-500">
+              Google Play Feature Graphic · 1024×500
+            </p>
+            <UButton
+              size="sm"
+              icon="i-lucide-download"
+              :loading="!!exporting"
+              :disabled="!!exporting"
+              @click="exportFG"
+            >
+              Download
+            </UButton>
+          </div>
+          <div class="inline-block rounded-xl overflow-hidden shadow-lg">
             <FeatureGraphic :cfg="slideConfig" />
           </div>
           <div
@@ -430,6 +472,8 @@ onMounted(() => { ready.value = true })
               :label="config.copy[i]?.label || `Slide ${i + 1}`"
               :device-frame="deviceFrame"
               @export="exportOne(i)"
+              @edit="openEdit(i)"
+              @position="(v: { dx: number, dy: number } | null) => setSlidePosition(i, v)"
             />
           </div>
 
@@ -453,5 +497,54 @@ onMounted(() => { ready.value = true })
         </template>
       </div>
     </div>
+
+    <!-- Inline slide-copy editor -->
+    <UModal
+      :open="editingSlide !== null"
+      :title="`Edit slide ${editingSlide !== null ? editingSlide + 1 : ''}`"
+      description="Tweak the label and headline. Use line breaks in the headline to wrap to a second line."
+      @update:open="(v: boolean) => { if (!v) editingSlide = null }"
+    >
+      <template #body>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Label</label>
+            <UInput
+              v-model="editingDraft.label"
+              placeholder="HERO"
+              class="w-full"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Headline</label>
+            <UTextarea
+              v-model="editingDraft.headline"
+              :rows="3"
+              placeholder="Line one&#10;Line two"
+              class="w-full"
+            />
+            <p class="mt-1 text-[10px] text-gray-500">
+              Up to 5 words per line, 2 lines.
+            </p>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2 w-full">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            @click="editingSlide = null"
+          >
+            Cancel
+          </UButton>
+          <UButton
+            @click="saveEdit"
+          >
+            Save
+          </UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
