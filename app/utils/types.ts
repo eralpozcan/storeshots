@@ -38,6 +38,7 @@ export type UserConfig = {
     provider: 'claude' | 'openrouter'
     apiKey: string
     openrouterModel: string
+    claudeModel: string
   }
 }
 

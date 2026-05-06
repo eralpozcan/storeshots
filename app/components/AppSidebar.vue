@@ -11,6 +11,7 @@ const emit = defineEmits<{
   change: [patch: Partial<UserConfig>]
   generate: []
   'generate-design': []
+  'extract-colors': []
 }>()
 
 // Template refs
@@ -264,11 +265,18 @@ function handleReset() {
       </button>
     </div>
 
-    <!-- App Info -->
-    <div
+    <!-- Step 1 — Basics -->
+    <section
       v-show="activeStep === 1"
       class="border-b border-gray-200 p-4 space-y-4"
     >
+      <header class="space-y-1">
+        <h2 class="text-sm font-bold text-gray-900">App basics</h2>
+        <p class="text-xs text-gray-500 leading-relaxed">
+          Identity used by AI prompts and rendered into the trust slide.
+        </p>
+      </header>
+
       <!-- Icon dropzone -->
       <div>
         <label class="block text-xs font-semibold text-gray-700 mb-1">
@@ -395,16 +403,33 @@ function handleReset() {
           Press Enter or comma to add a chip.
         </p>
       </div>
-    </div>
+    </section>
 
-    <!-- Brand Colors -->
-    <div
+    <!-- Step 5 — Style -->
+    <section
       v-show="activeStep === 5"
-      class="border-b border-gray-200 p-4"
+      class="border-b border-gray-200 p-4 space-y-4"
     >
-      <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase mb-3">
-        Brand Colors
-      </div>
+      <header class="space-y-1">
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="text-sm font-bold text-gray-900">Brand style</h2>
+          <button
+            type="button"
+            class="text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer flex items-center gap-1 shrink-0"
+            title="Pull dominant colours from your uploaded screenshots"
+            @click="emit('extract-colors')"
+          >
+            <UIcon
+              name="i-lucide-wand-sparkles"
+              class="size-3.5"
+            />
+            Auto
+          </button>
+        </div>
+        <p class="text-xs text-gray-500 leading-relaxed">
+          Colours drive slide gradients and accents. Hit Auto to derive a palette from your screenshots.
+        </p>
+      </header>
       <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
         <div
           v-for="[key, label] in colorFields"
@@ -435,33 +460,41 @@ function handleReset() {
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Screenshots -->
-    <div
+    <!-- Step 2 — Screenshots -->
+    <section
       v-show="activeStep === 2"
-      class="border-b border-gray-200 p-4"
+      class="border-b border-gray-200 p-4 space-y-3"
     >
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase">
-          Screenshots
+      <header class="space-y-1">
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="text-sm font-bold text-gray-900">Screenshots</h2>
+          <button
+            type="button"
+            class="text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer flex items-center gap-1 shrink-0"
+            @click="bulkInputRef?.click()"
+          >
+            <UIcon
+              name="i-lucide-upload"
+              class="size-3.5"
+            />
+            Upload all
+          </button>
         </div>
-        <button
-          class="text-[11px] font-medium text-blue-600 hover:text-blue-700 cursor-pointer"
-          @click="bulkInputRef?.click()"
-        >
-          Upload All
-        </button>
-        <input
-          ref="bulkInputRef"
-          type="file"
-          accept="image/*"
-          multiple
-          class="hidden"
-          @change="onBulkUpload"
-        >
-      </div>
-      <div class="flex gap-1 flex-wrap mb-3">
+        <p class="text-xs text-gray-500 leading-relaxed">
+          Drop up to 10 per device. Drag thumbnails to reorder.
+        </p>
+      </header>
+      <input
+        ref="bulkInputRef"
+        type="file"
+        accept="image/*"
+        multiple
+        class="hidden"
+        @change="onBulkUpload"
+      >
+      <div class="flex gap-1 flex-wrap">
         <button
           v-for="d in DEVICE_LABELS"
           :key="d.key"
@@ -521,20 +554,24 @@ function handleReset() {
           >
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- AI Generate -->
-    <div
+    <!-- Step 3 — AI -->
+    <section
       v-show="activeStep === 3"
-      class="border-b border-gray-200 p-4"
+      class="border-b border-gray-200 p-4 space-y-4"
     >
-      <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase mb-3">
-        AI Generate
-      </div>
+      <header class="space-y-1">
+        <h2 class="text-sm font-bold text-gray-900">AI generation</h2>
+        <p class="text-xs text-gray-500 leading-relaxed">
+          Pick a provider, paste a key, then generate copy or full design from your screenshots.
+        </p>
+      </header>
 
       <!-- Language -->
-      <div class="text-xs font-semibold text-gray-700 mb-1">App Language</div>
-      <USelect
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">App language</label>
+        <USelect
         :model-value="config.locale"
         :items="[
           { label: '🇬🇧 English', value: 'en' },
@@ -551,70 +588,70 @@ function handleReset() {
           { label: '🇳🇱 Nederlands', value: 'nl' },
           { label: '🇷🇺 Русский', value: 'ru' },
         ]"
-        value-key="value"
-        label-key="label"
-        size="sm"
-        class="mb-3"
-        @update:model-value="emit('change', { locale: $event as string })"
-      />
-      <p class="text-[10px] text-gray-400 mb-3 leading-relaxed">
-        Select the language of your app's UI. AI will analyze screenshots in this language and generate headlines accordingly.
-      </p>
+          value-key="value"
+          label-key="label"
+          size="sm"
+          class="w-full"
+          @update:model-value="emit('change', { locale: $event as string })"
+        />
+        <p class="mt-1 text-[10px] text-gray-400 leading-relaxed">
+          AI analyses screenshots in this language and generates headlines accordingly.
+        </p>
+      </div>
 
       <!-- Generate buttons -->
-      <div class="flex gap-1.5 mb-2">
-        <UButton
-          size="xs"
-          variant="outline"
-          class="flex-1"
-          :loading="generating"
-          :disabled="generating || !config.ai.apiKey"
-          @click="emit('generate')"
-        >
-          ✦ Headlines
-        </UButton>
-        <UButton
-          size="xs"
-          class="flex-1"
-          :loading="generating"
-          :disabled="generating || !config.ai.apiKey"
-          @click="emit('generate-design')"
-        >
-          ✦ Full Design
-        </UButton>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Generate</label>
+        <div class="flex gap-1.5">
+          <UButton
+            size="xs"
+            variant="outline"
+            class="flex-1"
+            :loading="generating"
+            :disabled="generating || !config.ai.apiKey"
+            @click="emit('generate')"
+          >
+            ✦ Headlines
+          </UButton>
+          <UButton
+            size="xs"
+            class="flex-1"
+            :loading="generating"
+            :disabled="generating || !config.ai.apiKey"
+            @click="emit('generate-design')"
+          >
+            ✦ Full design
+          </UButton>
+        </div>
       </div>
 
       <!-- How it works -->
-      <div class="bg-blue-50 rounded-lg p-2.5 mb-3">
+      <div class="bg-blue-50 rounded-lg p-2.5">
         <p class="text-[10px] text-blue-700 leading-relaxed">
           <b>How it works:</b> Upload your screenshots first, then click generate.
           AI will analyze each image to understand what's on screen, and write matching headlines.
         </p>
         <div class="mt-1.5 text-[10px] text-blue-600 leading-relaxed">
           <b>✦ Headlines</b> — copy only<br>
-          <b>✦ Full Design</b> — copy + brand colors from your screenshots
+          <b>✦ Full design</b> — copy + brand colors from your screenshots
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Slide copy list (Headlines step) -->
-    <div
+    <!-- Step 4 — Headlines -->
+    <section
       v-show="activeStep === 4"
-      class="border-b border-gray-200 p-4"
+      class="border-b border-gray-200 p-4 space-y-3"
     >
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase">
-          Slide Headlines
+      <header class="space-y-1">
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="text-sm font-bold text-gray-900">Slide headlines</h2>
+          <span class="text-[10px] text-gray-400 shrink-0">drag to reorder</span>
         </div>
-        <span class="text-[10px] text-gray-400">drag to reorder</span>
-      </div>
-      <div class="flex items-center justify-between mb-2 hidden">
-        <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase">
-          Slides
-        </div>
-        <span class="text-[10px] text-gray-400">drag to reorder</span>
-      </div>
-
+        <p class="text-xs text-gray-500 leading-relaxed">
+          Edit copy inline. Reorder by dragging a row.
+        </p>
+      </header>
       <div
         v-for="(slide, i) in config.copy"
         :key="i"
@@ -670,41 +707,44 @@ function handleReset() {
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- AI Settings -->
-    <div
+    <!-- Step 3 — AI provider & key (continues the AI step) -->
+    <section
       v-show="activeStep === 3"
-      class="border-b border-gray-200 p-4"
+      class="border-b border-gray-200 p-4 space-y-3"
     >
-      <div class="text-[11px] font-bold text-gray-500 tracking-wider uppercase mb-3">
-        AI Settings
-      </div>
-      <div class="text-xs font-semibold text-gray-700 mb-1">
-        Provider
-      </div>
-      <USelect
-        :model-value="config.ai.provider"
-        :items="[{ label: 'Claude (Anthropic)', value: 'claude' }, { label: 'OpenRouter', value: 'openrouter' }]"
-        value-key="value"
-        label-key="label"
-        size="sm"
-        class="mb-2"
-        @update:model-value="updateAi({ provider: $event as 'claude' | 'openrouter' })"
-      />
-      <template v-if="config.ai.provider === 'openrouter'">
-        <div class="text-xs font-semibold text-gray-700 mb-1">
-          Model
-        </div>
-        <UInput
-          :model-value="config.ai.openrouterModel"
+      <header class="space-y-1">
+        <h2 class="text-sm font-bold text-gray-900">Provider & key</h2>
+        <p class="text-xs text-gray-500 leading-relaxed">
+          Bring your own AI key. It is stored in sessionStorage and cleared when you close the tab.
+        </p>
+      </header>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Provider</label>
+        <USelect
+          :model-value="config.ai.provider"
+          :items="[{ label: 'Claude (Anthropic)', value: 'claude' }, { label: 'OpenRouter', value: 'openrouter' }]"
+          value-key="value"
+          label-key="label"
           size="sm"
-          placeholder="anthropic/claude-3-5-sonnet"
-          class="mb-1.5"
-          @update:model-value="updateAi({ openrouterModel: $event as string })"
+          class="w-full"
+          @update:model-value="updateAi({ provider: $event as 'claude' | 'openrouter' })"
         />
+      </div>
+      <template v-if="config.ai.provider === 'openrouter'">
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Model</label>
+          <UInput
+            :model-value="config.ai.openrouterModel"
+            size="sm"
+            placeholder="anthropic/claude-3-5-sonnet"
+            class="w-full"
+            @update:model-value="updateAi({ openrouterModel: $event as string })"
+          />
+        </div>
         <!-- Vision-capable models (recommended) -->
-        <div class="bg-amber-50 border border-amber-200 rounded-lg p-2 mb-2">
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-2">
           <p class="text-[10px] text-amber-700 font-semibold mb-1">👁 Vision models (recommended)</p>
           <p class="text-[10px] text-amber-600 leading-relaxed mb-1.5">
             These models can analyze your screenshots for better, more accurate headlines.
@@ -725,34 +765,57 @@ function handleReset() {
           </div>
         </div>
         <!-- Free text-only models -->
-        <p class="text-[10px] text-gray-400 mb-2 leading-relaxed">
-          Free (text-only): <span class="text-gray-500 cursor-pointer hover:text-blue-500" @click="updateAi({ openrouterModel: 'google/gemini-2.0-flash-exp:free' })">gemini-2.0-flash:free</span>,
+        <p class="text-[10px] text-gray-400 leading-relaxed">
+          Free (text-only):
+          <span class="text-gray-500 cursor-pointer hover:text-blue-500" @click="updateAi({ openrouterModel: 'google/gemini-2.0-flash-exp:free' })">gemini-2.0-flash:free</span>,
           <span class="text-gray-500 cursor-pointer hover:text-blue-500" @click="updateAi({ openrouterModel: 'meta-llama/llama-4-maverick:free' })">llama-4-maverick:free</span>,
           <span class="text-gray-500 cursor-pointer hover:text-blue-500" @click="updateAi({ openrouterModel: 'deepseek/deepseek-chat-v3-0324:free' })">deepseek-chat:free</span>
         </p>
       </template>
-      <!-- Claude info -->
+      <!-- Claude model picker + info -->
       <template v-if="config.ai.provider === 'claude'">
-        <div class="bg-green-50 border border-green-200 rounded-lg p-2 mb-2">
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Model</label>
+          <USelect
+            :model-value="config.ai.claudeModel"
+            :items="[
+              { label: 'Claude Opus 4.7 — most capable', value: 'claude-opus-4-7' },
+              { label: 'Claude Sonnet 4.6 — balanced (default)', value: 'claude-sonnet-4-6' },
+              { label: 'Claude Haiku 4.5 — fast & cheap', value: 'claude-haiku-4-5-20251001' },
+              { label: 'Claude 3.5 Sonnet — older, vision', value: 'claude-3-5-sonnet-20241022' },
+              { label: 'Claude 3.5 Haiku — older, cheap', value: 'claude-3-5-haiku-20241022' },
+            ]"
+            value-key="value"
+            label-key="label"
+            size="sm"
+            class="w-full"
+            @update:model-value="updateAi({ claudeModel: $event as string })"
+          />
+          <p class="mt-1 text-[10px] text-gray-400 leading-relaxed">
+            All Claude 4.x and 3.5 models support vision. Pick Opus for best quality, Haiku to save cost.
+          </p>
+        </div>
+        <div class="bg-green-50 border border-green-200 rounded-lg p-2">
           <p class="text-[10px] text-green-700 leading-relaxed">
-            👁 <b>Claude supports vision</b> — your screenshots will be analyzed for accurate, context-aware headlines.
+            👁 <b>Vision-ready</b> — screenshots are analysed for accurate, context-aware headlines.
           </p>
         </div>
       </template>
-      <div class="text-xs font-semibold text-gray-700 mb-1">
-        API Key
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">API key</label>
+        <UInput
+          :model-value="config.ai.apiKey"
+          type="password"
+          size="sm"
+          :placeholder="config.ai.provider === 'claude' ? 'sk-ant-...' : 'sk-or-...'"
+          class="w-full"
+          @update:model-value="updateAi({ apiKey: $event as string })"
+        />
+        <p class="mt-1 text-[10px] text-gray-400 leading-relaxed">
+          Stored only in this tab's sessionStorage. Cleared when you close the tab.
+        </p>
       </div>
-      <UInput
-        :model-value="config.ai.apiKey"
-        type="password"
-        size="sm"
-        :placeholder="config.ai.provider === 'claude' ? 'sk-ant-...' : 'sk-or-...'"
-        @update:model-value="updateAi({ apiKey: $event as string })"
-      />
-      <p class="text-[11px] text-gray-400 mt-1.5">
-        Key is stored in session only — cleared when you close the tab.
-      </p>
-    </div>
+    </section>
 
     <!-- Reset -->
     <div class="p-4 pb-6">

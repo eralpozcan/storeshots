@@ -40,6 +40,7 @@ export const DEFAULT_CONFIG: UserConfig = {
     provider: 'claude',
     apiKey: '',
     openrouterModel: 'anthropic/claude-3-5-sonnet',
+    claudeModel: 'claude-sonnet-4-6',
   },
 }
 

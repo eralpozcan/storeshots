@@ -160,6 +160,7 @@ export default defineEventHandler(async (event) => {
 
   const apiKey = ensureString(body.apiKey, 'apiKey', 512)
   const openrouterModel = ensureString(body.openrouterModel, 'openrouterModel', 128, false)
+  const claudeModel = ensureString(body.claudeModel, 'claudeModel', 64, false) || 'claude-sonnet-4-6'
   const appName = ensureString(body.appName, 'appName', 200, false)
   const appDescription = ensureString(body.appDescription, 'appDescription', 4000, false)
   const locale = ensureString(body.locale ?? 'en', 'locale', 8, false)
@@ -216,7 +217,7 @@ export default defineEventHandler(async (event) => {
           'anthropic-version': '2023-06-01',
         },
         body: {
-          model: 'claude-sonnet-4-6',
+          model: claudeModel,
           max_tokens: 2048,
           system: msgPayload.system,
           messages: msgPayload.messages,
