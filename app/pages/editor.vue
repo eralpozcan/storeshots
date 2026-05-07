@@ -163,14 +163,78 @@ function setRef(i: number, el: any) {
 
 // Export helpers
 async function captureElement(el: HTMLElement, tw: number, th: number): Promise<string> {
-  el.style.left = '0px'
-  el.style.zIndex = '-1'
-  await new Promise(r => setTimeout(r, 380))
-  const opts = { width: tw, height: th, pixelRatio: 1, cacheBust: true }
-  await toPng(el, opts) // warm-up
-  const dataUrl = await toPng(el, opts)
-  el.style.left = '-9999px'
-  el.style.zIndex = ''
+  // Wait for fonts to load
+  if (typeof document !== 'undefined' && 'fonts' in document) {
+    try {
+      await (document.fonts as any).ready
+    } catch (e) {
+      console.warn('Font loading failed, proceeding anyway:', e)
+    }
+  }
+  
+  // Clone the element for capture (avoids needing to manipulate original)
+  const clone = el.cloneNode(true) as HTMLElement
+  
+  // Create a capture container
+  const container = document.createElement('div')
+  container.style.position = 'fixed'
+  container.style.left = '0px'
+  container.style.top = '0px'
+  container.style.width = `${tw}px`
+  container.style.height = `${th}px`
+  container.style.zIndex = '99999'
+  container.style.visibility = 'visible'
+  container.style.display = 'block'
+  container.style.overflow = 'visible'
+  container.style.backgroundColor = '#ffffff'
+  
+  // Style the clone to fill the container
+  clone.style.position = 'static'
+  clone.style.width = `${tw}px`
+  clone.style.height = `${th}px`
+  clone.style.visibility = 'visible'
+  clone.style.display = 'block'
+  clone.style.overflow = 'visible'
+  
+  // Append to container and container to DOM
+  container.appendChild(clone)
+  document.body.appendChild(container)
+  
+  // Wait for rendering
+  await new Promise(r => setTimeout(r, 1200))
+  
+  // Force reflow
+  container.offsetHeight
+  clone.offsetHeight
+  
+  const opts = { 
+    width: tw, 
+    height: th, 
+    pixelRatio: 1, 
+    cacheBust: false,
+    backgroundColor: '#ffffff',
+    allowTaint: true,
+    useCORS: true,
+  }
+  
+  try {
+    await toPng(clone, opts) // warm-up
+  } catch (e) {
+    console.warn('First toPng attempt failed:', e)
+  }
+  
+  let dataUrl: string
+  try {
+    dataUrl = await toPng(clone, opts)
+  } catch (e) {
+    console.error('toPng failed:', e)
+    // Fallback: try capturing from container
+    dataUrl = await toPng(container, opts)
+  }
+  
+  // Clean up
+  document.body.removeChild(container)
+  
   return dataUrl
 }
 
