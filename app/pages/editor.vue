@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { toPng } from 'html-to-image'
+import { toPng, getFontEmbedCSS } from 'html-to-image'
 import JSZip from 'jszip'
 import type { Device, Orientation } from '~/utils/types'
 import { FGW, FGH, STORE_PRESETS } from '~/utils/canvas'
@@ -162,80 +162,69 @@ function setRef(i: number, el: any) {
 }
 
 // Export helpers
+// Capture an offscreen export node to PNG. Builds on @wolfhongkong's fix
+// in #2: clone into a dedicated container so the original DOM isn't mutated,
+// wait for fonts, force reflow, then run a warm-up + real toPng pass.
+//
+// Polish on top of #2:
+// - inline font CSS via getFontEmbedCSS to defuse cross-origin font taint
+//   (the underlying root cause of blank exports for some users)
+// - drop html2canvas-only opts (allowTaint/useCORS) that html-to-image ignores
+// - drop forced white backgroundColor so transparent/dark designs survive
+// - cacheBust: true so stale cached assets don't re-introduce blank frames
+// - pixelRatio: 2 for sharper store screenshots
+// - shorter wait (rAF + small timeout) once fonts.ready resolves
+// - try/finally guarantees the capture container is removed on error
 async function captureElement(el: HTMLElement, tw: number, th: number): Promise<string> {
-  // Wait for fonts to load
   if (typeof document !== 'undefined' && 'fonts' in document) {
-    try {
-      await (document.fonts as any).ready
-    } catch (e) {
-      console.warn('Font loading failed, proceeding anyway:', e)
-    }
+    try { await (document.fonts as any).ready } catch (e) { console.warn('Font loading failed, proceeding anyway:', e) }
   }
-  
-  // Clone the element for capture (avoids needing to manipulate original)
+
+  let fontEmbedCSS: string | undefined
+  try { fontEmbedCSS = await getFontEmbedCSS(el) } catch (e) { console.warn('getFontEmbedCSS failed:', e) }
+
   const clone = el.cloneNode(true) as HTMLElement
-  
-  // Create a capture container
   const container = document.createElement('div')
+  // Off-viewport but laid out — html-to-image needs real layout, but the user
+  // shouldn't see a giant flash of the export node during capture.
   container.style.position = 'fixed'
-  container.style.left = '0px'
+  container.style.left = '-100000px'
   container.style.top = '0px'
   container.style.width = `${tw}px`
   container.style.height = `${th}px`
-  container.style.zIndex = '99999'
-  container.style.visibility = 'visible'
+  container.style.pointerEvents = 'none'
   container.style.display = 'block'
   container.style.overflow = 'visible'
-  container.style.backgroundColor = '#ffffff'
-  
-  // Style the clone to fill the container
+  container.setAttribute('aria-hidden', 'true')
+
   clone.style.position = 'static'
   clone.style.width = `${tw}px`
   clone.style.height = `${th}px`
   clone.style.visibility = 'visible'
   clone.style.display = 'block'
   clone.style.overflow = 'visible'
-  
-  // Append to container and container to DOM
+
   container.appendChild(clone)
   document.body.appendChild(container)
-  
-  // Wait for rendering
-  await new Promise(r => setTimeout(r, 1200))
-  
-  // Force reflow
+
+  await new Promise(r => requestAnimationFrame(() => r(null)))
+  await new Promise(r => setTimeout(r, 200))
   container.offsetHeight
   clone.offsetHeight
-  
-  const opts = { 
-    width: tw, 
-    height: th, 
-    pixelRatio: 1, 
-    cacheBust: false,
-    backgroundColor: '#ffffff',
-    allowTaint: true,
-    useCORS: true,
-  }
-  
+
+  const opts = { width: tw, height: th, pixelRatio: 2, cacheBust: true, fontEmbedCSS }
+
   try {
-    await toPng(clone, opts) // warm-up
-  } catch (e) {
-    console.warn('First toPng attempt failed:', e)
+    try { await toPng(clone, opts) } catch (e) { console.warn('First toPng attempt failed:', e) }
+    try {
+      return await toPng(clone, opts)
+    } catch (e) {
+      console.error('toPng failed, falling back to container capture:', e)
+      return await toPng(container, opts)
+    }
+  } finally {
+    document.body.removeChild(container)
   }
-  
-  let dataUrl: string
-  try {
-    dataUrl = await toPng(clone, opts)
-  } catch (e) {
-    console.error('toPng failed:', e)
-    // Fallback: try capturing from container
-    dataUrl = await toPng(container, opts)
-  }
-  
-  // Clean up
-  document.body.removeChild(container)
-  
-  return dataUrl
 }
 
 function downloadPng(url: string, name: string) {
