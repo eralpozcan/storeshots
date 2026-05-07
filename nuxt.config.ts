@@ -139,7 +139,7 @@ export default defineNuxtConfig({
     nonce: true,
     headers: {
       contentSecurityPolicy: {
-        'base-uri': ["'self'", 'blob:'],
+        'base-uri': ["'self'"],
         'img-src': ["'self'", 'data:', 'blob:', 'https:'],
         // `'unsafe-inline'` is intentionally absent: nuxt-security injects a
         // per-request nonce into Nuxt's hydration scripts. `'unsafe-eval'`
