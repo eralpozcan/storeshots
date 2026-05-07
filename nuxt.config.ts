@@ -30,7 +30,7 @@ export default defineNuxtConfig({
   ],
   fonts: {
     families: [
-      { name: 'Inter', provider: 'google', weights: [400, 600, 700] },
+      { name: 'Inter', provider: 'google', weights: [400, 600, 700], preload: true, display: 'swap' },
     ],
   },
   site: {
@@ -68,6 +68,8 @@ export default defineNuxtConfig({
         { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png' },
         { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
         { rel: 'manifest', href: '/site.webmanifest' },
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: 'anonymous' },
       ],
     },
   },
@@ -137,7 +139,7 @@ export default defineNuxtConfig({
     nonce: true,
     headers: {
       contentSecurityPolicy: {
-        'base-uri': ["'self'"],
+        'base-uri': ["'self'", 'blob:'],
         'img-src': ["'self'", 'data:', 'blob:', 'https:'],
         // `'unsafe-inline'` is intentionally absent: nuxt-security injects a
         // per-request nonce into Nuxt's hydration scripts. `'unsafe-eval'`
