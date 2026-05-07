@@ -239,6 +239,9 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
+[0.6.3]: https://github.com/eralpozcan/storeshots/compare/v0.6.2...v0.6.3
+[0.6.2]: https://github.com/eralpozcan/storeshots/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/eralpozcan/storeshots/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/eralpozcan/storeshots/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/eralpozcan/storeshots/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/eralpozcan/storeshots/compare/v0.3.0...v0.4.0
