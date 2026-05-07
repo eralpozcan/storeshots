@@ -4,6 +4,55 @@ All notable changes to Storeshots are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project loosely
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] — 2026-05-07
+
+### Added
+- **Skip empty slides on bulk export** — "Export all" and preset ZIP
+  bundles now skip slides with no screenshot uploaded for the current
+  device, so users no longer ship blank template PNGs to the stores.
+  The trust slide stays in by design (it's intentionally text-only).
+  Single-slide download from a card is unchanged.
+- **"No screenshot" badge** on slide cards so empty slides are visible
+  at a glance before bulk export.
+- Toast feedback after bulk runs: how many slides exported, how many
+  skipped, or a clear warning when nothing was eligible.
+
+## [0.6.2] — 2026-05-07
+
+### Improved
+- **Cross-origin font safety on export** — fonts are now inlined via
+  `getFontEmbedCSS` before capture, removing canvas taint as a failure
+  mode for blank exports.
+- **Transparent and dark designs preserved** — the export pipeline no
+  longer forces a white background.
+- **Sharper exports** — `pixelRatio: 2` for store-ready resolution.
+- **No more full-screen flash during download** — the offscreen capture
+  container now sits off-viewport instead of on top of the page.
+- **Faster, more reliable capture** — 1200ms blanket sleep replaced with
+  `document.fonts.ready` + `requestAnimationFrame` + a small layout
+  settle. `try/finally` guarantees cleanup even when capture throws.
+
+### Fixed
+- Removed `allowTaint` / `useCORS` opts (those belong to `html2canvas`,
+  `html-to-image` ignores them).
+- Restored `cacheBust: true` so stale assets can't re-introduce blank
+  frames.
+- Reverted the temporary CSP `base-uri` `blob:` addition — it wasn't a
+  meaningful base href source and the underlying console warning is a
+  separate concern.
+
+## [0.6.1] — 2026-05-07
+
+### Fixed
+- **Blank screenshot exports** — downloaded PNGs were sometimes empty.
+  Capture pipeline rebuilt to clone the export node into a dedicated
+  offscreen container, wait for fonts, force reflow, and run a robust
+  warm-up + try/catch with a fallback path. Inter font is preloaded
+  with `display: swap` and Google Fonts get `preconnect` hints for
+  faster, more reliable availability. Huge thanks to **@wolfhongkong**
+  for diagnosing and fixing this in
+  [#2](https://github.com/eralpozcan/storeshots/pull/2).
+
 ## [0.6.0] — 2026-05-06
 
 ### Added
