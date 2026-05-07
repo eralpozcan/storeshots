@@ -11,6 +11,11 @@ const props = defineProps<{
   deviceFrame: 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad'
 }>()
 
+// True when this slide has a screenshot uploaded for the current device.
+// The trust slide (variant 10) is intentionally text-only, so it always
+// counts as "has content" — only screenshot slides surface the empty state.
+const hasContent = computed(() => props.variant === 10 || !!props.cfg.images[props.index])
+
 const emit = defineEmits<{
   export: []
   edit: []
@@ -111,6 +116,20 @@ function cancelAdjust() {
           :device-frame="deviceFrame"
           :position-override="adjustMode ? tempPos : null"
         />
+      </div>
+
+      <!-- "No screenshot" badge — surfaces empty slides at a glance. Bulk
+           export (Export all / preset ZIP) skips these to avoid shipping
+           blank templates; users can still single-export from the card. -->
+      <div
+        v-if="!hasContent && !adjustMode"
+        class="absolute bottom-2 left-2 z-10 px-2 py-1 rounded-md bg-amber-100/95 text-amber-700 text-[10px] font-semibold shadow-sm flex items-center gap-1 pointer-events-none"
+      >
+        <UIcon
+          name="i-lucide-image-off"
+          class="size-3"
+        />
+        No screenshot
       </div>
 
       <!-- Hover overlay actions -->

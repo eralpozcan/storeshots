@@ -257,18 +257,52 @@ async function exportFG() {
   finally { exporting.value = null }
 }
 
+// Bulk export skips slides that have no screenshot uploaded for the current
+// device — they would just produce blank templates and waste capture time.
+// The trust slide (variant 10) is text-only by design and always exports.
+// Single-slide export from the card is unchanged: if a user explicitly
+// clicks the per-slide download button, we honor it.
+function slideHasContent(i: number, variant: number): boolean {
+  if (variant === 10) return true
+  return !!slideConfig.value.images?.[i]
+}
+
+const toast = useToast()
+
 async function exportAll() {
   if (device.value === 'feature-graphic') { await exportFG(); return }
   const s = sizePick.value
   const variants = slideVariants.value
+  let exported = 0
+  let skipped = 0
   for (let i = 0; i < variants.length; i++) {
     const el = exportRefs.value[i]
     if (!el) continue
+    if (!slideHasContent(i, variants[i]!)) { skipped++; continue }
     exporting.value = `${i + 1}/${variants.length}`
     downloadPng(await captureElement(el, s.w, s.h), fname(i))
+    exported++
     await new Promise(r => setTimeout(r, 420))
   }
   exporting.value = null
+  if (exported === 0 && skipped > 0) {
+    toast.add({
+      title: 'No screenshots to export',
+      description: 'Upload screenshots to your slides first, then try again.',
+      color: 'warning',
+      icon: 'i-lucide-image-off',
+      duration: 5000,
+    })
+  }
+  else if (skipped > 0) {
+    toast.add({
+      title: `Exported ${exported} slide${exported === 1 ? '' : 's'}`,
+      description: `${skipped} skipped — no screenshot uploaded.`,
+      color: 'info',
+      icon: 'i-lucide-info',
+      duration: 4000,
+    })
+  }
 }
 
 const slugLabel = (l: string) => l.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
@@ -285,6 +319,8 @@ async function exportPreset(preset: StorePreset) {
   const zip = new JSZip()
   const appSlug = slugLabel(config.value.appName || 'app') || 'app'
   let totalCaptured = 0
+  let presetExported = 0
+  let presetSkipped = 0
   const totalToCapture = preset.targets.reduce((acc: number, t: PresetTarget) => {
     const variantCount = (t.device === 'iphone' || t.device === 'ipad')
       ? SLIDE_COUNT_APPLE
@@ -309,16 +345,28 @@ async function exportPreset(preset: StorePreset) {
         for (let i = 0; i < variants.length; i++) {
           const el = exportRefs.value[i]
           if (!el) continue
+          if (!slideHasContent(i, variants[i]!)) { presetSkipped++; continue }
           totalCaptured++
           exporting.value = `${preset.label} · ${totalCaptured}/${totalToCapture}`
           const dataUrl = await captureElement(el, size.w, size.h)
           const lbl = slugLabel(config.value.copy[i]?.label || '') || 'slide'
           const filename = `${String(i + 1).padStart(2, '0')}-${lbl}.png`
           folder.file(filename, dataUrl.split(',')[1] || '', { base64: true })
+          presetExported++
         }
       }
     }
 
+    if (presetExported === 0) {
+      toast.add({
+        title: 'Nothing to export',
+        description: 'No screenshots uploaded yet. Add screenshots to your slides first.',
+        color: 'warning',
+        icon: 'i-lucide-image-off',
+        duration: 5000,
+      })
+      return
+    }
     exporting.value = 'Zipping…'
     const blob = await zip.generateAsync({ type: 'blob' })
     const url = URL.createObjectURL(blob)
@@ -327,6 +375,15 @@ async function exportPreset(preset: StorePreset) {
     a.download = `${appSlug}-${preset.key}.zip`
     a.click()
     URL.revokeObjectURL(url)
+    if (presetSkipped > 0) {
+      toast.add({
+        title: `${preset.label} bundle ready`,
+        description: `${presetExported} captured · ${presetSkipped} skipped (no screenshot uploaded for those slides).`,
+        color: 'info',
+        icon: 'i-lucide-info',
+        duration: 5000,
+      })
+    }
   }
   finally {
     device.value = origDevice
