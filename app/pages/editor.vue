@@ -2,7 +2,7 @@
 import type { ComponentPublicInstance } from 'vue'
 import { toPng, getFontEmbedCSS } from 'html-to-image'
 import JSZip from 'jszip'
-import type { Device, Orientation } from '~/utils/types'
+import type { Device, Orientation, SlideElement } from '~/utils/types'
 import { FGW, FGH, STORE_PRESETS } from '~/utils/canvas'
 import type { StorePreset, PresetTarget } from '~/utils/canvas'
 import { SLIDE_COUNT_APPLE, SLIDE_COUNT_ANDROID, DEFAULT_CONFIG } from '~/utils/defaults'
@@ -106,12 +106,20 @@ function saveEdit() {
 
 // Focused canvas — one slide blown up in the center, thumb strip beneath for
 // quick switching. Entered via the maximize button on each SlideCard's hover
-// overlay or by clicking a thumbnail. Exit with ESC or the close button. The
-// device transform handles (Phase 2b) will live inside this mode only — the
-// grid stays read-only-ish to keep multi-slide review fast.
+// overlay or by clicking a thumbnail. Exit with ESC or the close button.
+// Device transform handles live in this mode only.
 const focusedSlideIdx = ref<number | null>(null)
 function enterFocus(i: number) { focusedSlideIdx.value = i }
 function exitFocus() { focusedSlideIdx.value = null }
+
+// Read/write helper for the per-slide elements[] override. Used by the
+// transform overlay's element-change events.
+const { patchElement, resetSlide, isOverridden } = useElementOverride(config, updateConfig)
+function onElementChange(slideIdx: number, payload: { id: string, patch: Partial<SlideElement> }) {
+  const variant = slideVariants.value[slideIdx]
+  if (variant === undefined) return
+  patchElement(slideIdx, variant, payload.id, payload.patch)
+}
 
 function setSlidePosition(i: number, value: { dx: number, dy: number } | null) {
   const next = [...config.value.copy]
@@ -957,6 +965,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               </div>
               <div class="flex items-center gap-2 shrink-0">
                 <UButton
+                  v-if="isOverridden(focusedSlideIdx)"
+                  size="sm"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-rotate-ccw"
+                  title="Restore default layout for this slide"
+                  @click="resetSlide(focusedSlideIdx)"
+                >
+                  Reset layout
+                </UButton>
+                <UButton
                   size="sm"
                   color="neutral"
                   variant="outline"
@@ -993,9 +1012,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   :c-h="canvasDims.cH"
                   :label="config.copy[focusedSlideIdx]?.label || `Slide ${focusedSlideIdx + 1}`"
                   :device-frame="deviceFrame"
+                  :transform-mode="true"
                   @export="exportOne(focusedSlideIdx)"
                   @edit="openEdit(focusedSlideIdx)"
                   @position="(v: { dx: number, dy: number } | null) => setSlidePosition(focusedSlideIdx!, v)"
+                  @element-change="(p: { id: string, patch: Partial<SlideElement> }) => onElementChange(focusedSlideIdx!, p)"
                 />
               </div>
             </div>

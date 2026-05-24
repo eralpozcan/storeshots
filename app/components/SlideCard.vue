@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { SlideConfig } from '~/utils/types'
+import type { SlideConfig, SlideElement } from '~/utils/types'
+import { VARIANT_PRESETS } from '~/utils/canvas'
 
 const props = defineProps<{
   index: number
@@ -9,7 +10,20 @@ const props = defineProps<{
   cH: number
   label: string
   deviceFrame: 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad'
+  // When true, render the transform overlay (device move/resize/rotate
+  // handles) above SlideTemplate. Used by the focused canvas mode.
+  transformMode?: boolean
 }>()
+
+// Resolve the slide's element list once — shared between SlideTemplate
+// (rendering) and SlideTransformOverlay (interaction). Both consume the same
+// fallback chain, so passing it explicitly avoids double-resolution.
+const elements = computed<SlideElement[]>(() => {
+  return props.cfg.copy[props.index]?.elements
+    ?? VARIANT_PRESETS[props.variant]
+    ?? VARIANT_PRESETS[1]
+    ?? []
+})
 
 // True when this slide has a screenshot uploaded for the current device.
 // The trust slide (variant 10) is intentionally text-only, so it always
@@ -22,6 +36,8 @@ const emit = defineEmits<{
   focus: []
   // null payload = reset to default
   position: [value: { dx: number, dy: number } | null]
+  // Forwarded from SlideTransformOverlay when the user drags a device frame.
+  'element-change': [payload: { id: string, patch: Partial<SlideElement> }]
 }>()
 
 const cardRef = ref<HTMLDivElement>()
@@ -107,7 +123,7 @@ function cancelAdjust() {
           position: 'absolute', top: 0, left: 0,
           width: `${cW}px`, height: `${cH}px`,
           transform: `scale(${scale})`, transformOrigin: 'top left',
-          pointerEvents: 'none'
+          pointerEvents: transformMode ? undefined : 'none'
         }"
       >
         <SlideTemplate
@@ -117,6 +133,14 @@ function cancelAdjust() {
           :c-h="cH"
           :device-frame="deviceFrame"
           :position-override="adjustMode ? tempPos : null"
+        />
+        <SlideTransformOverlay
+          v-if="transformMode"
+          :elements="elements"
+          :c-w="cW"
+          :c-h="cH"
+          :device-frame="deviceFrame"
+          @element-change="(p: { id: string, patch: Partial<SlideElement> }) => emit('element-change', p)"
         />
       </div>
 

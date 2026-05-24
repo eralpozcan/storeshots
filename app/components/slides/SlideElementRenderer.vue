@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type { SlideElement, Anchor, ElementShadow, SlideConfig, BrandColors } from '~/utils/types'
+import type { SlideElement, ElementShadow, SlideConfig, BrandColors } from '~/utils/types'
 import type { DeviceFrame } from '~/utils/canvas'
 import { DEVICE_WIDTH_FNS } from '~/utils/canvas'
 import { PLACEHOLDER_IMG } from '~/utils/defaults'
+import { anchorSides, anchorTransform, combineTransform } from '~/utils/anchor'
 
 const props = defineProps<{
   element: SlideElement
@@ -20,26 +21,6 @@ const props = defineProps<{
 }>()
 
 function imgSrc(v: string | null | undefined) { return v || PLACEHOLDER_IMG }
-
-// Anchor → CSS sides. x/y are %s on the canvas. Negative values intentionally
-// push past the edge for "device peeks out" effects.
-function anchorSides(anchor: Anchor, x: number, y: number) {
-  const horiz = anchor.endsWith('r') ? { right: `${x}%` } : { left: `${x}%` }
-  const vert = anchor.startsWith('b') ? { bottom: `${y}%` } : { top: `${y}%` }
-  return { ...horiz, ...vert }
-}
-
-function anchorTransform(anchor: Anchor): string {
-  if (anchor === 'tc' || anchor === 'bc') return 'translateX(-50%)'
-  if (anchor === 'cl' || anchor === 'cr') return 'translateY(-50%)'
-  if (anchor === 'c') return 'translate(-50%, -50%)'
-  return ''
-}
-
-function combineTransform(parts: (string | undefined | false)[]): string | undefined {
-  const filtered = parts.filter(Boolean).join(' ').trim()
-  return filtered || undefined
-}
 
 function resolveShadowColor(s: ElementShadow, c: BrandColors): string {
   const base = s.color === 'primary' ? c.primary : s.color === 'accent' ? c.accent : '#000000'
