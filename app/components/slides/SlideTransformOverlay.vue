@@ -449,11 +449,11 @@ function hintLabel(el: DraggableElement): string {
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
     >
-      <!-- Rotate handle — only on devices, offset above the top edge so it
-           doesn't crowd the corner resize handles. Hold Shift while dragging
-           to snap to 15° increments for clean angles. -->
+      <!-- Rotate handle — available on devices and captions. Offset above
+           the top edge so it doesn't crowd the corner/edge resize handles.
+           Hold Shift while dragging to snap to 15° increments. -->
       <div
-        v-if="el.type === 'device'"
+        v-if="el.type === 'device' || el.type === 'caption'"
         :style="{
           position: 'absolute',
           left: '50%', top: '0',
@@ -481,7 +481,7 @@ function hintLabel(el: DraggableElement): string {
       <!-- Visual tether between rotate handle and element top, so the
            interaction is legible from a glance. -->
       <div
-        v-if="el.type === 'device'"
+        v-if="el.type === 'device' || el.type === 'caption'"
         :style="{
           position: 'absolute',
           left: '50%', top: '0',
