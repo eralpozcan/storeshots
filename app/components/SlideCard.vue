@@ -36,6 +36,7 @@ const emit = defineEmits<{
   focus: []
   // Forwarded from SlideTransformOverlay when the user drags an element.
   'element-change': [payload: { id: string, patch: Partial<SlideElement> }]
+  'element-delete': [id: string]
 }>()
 
 const cardRef = ref<HTMLDivElement>()
@@ -84,6 +85,7 @@ onUnmounted(() => ro?.disconnect())
           :c-h="cH"
           :device-frame="deviceFrame"
           @element-change="(p: { id: string, patch: Partial<SlideElement> }) => emit('element-change', p)"
+          @element-delete="(id: string) => emit('element-delete', id)"
         />
       </div>
 

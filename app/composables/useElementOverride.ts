@@ -98,7 +98,29 @@ export function useElementOverride(
     return !!(c?.elements || c?.variant)
   }
 
-  return { resolveElements, patchElement, writeElements, resetSlide, setVariant, isOverridden }
+  // Append a new element to the slide. Always writes through writeElements
+  // so the preset-equality drop kicks in (new element guarantees no preset
+  // match, so an override is created).
+  function addElement(slideIdx: number, variant: number, el: SlideElement) {
+    const current = resolveElements(slideIdx, variant)
+    writeElements(slideIdx, variant, [...current, el])
+  }
+
+  // Remove an element by id. If removing collapses the override back to the
+  // preset (e.g. user added then removed in the same session), writeElements
+  // handles the drop.
+  function removeElement(slideIdx: number, variant: number, elementId: string) {
+    const current = resolveElements(slideIdx, variant)
+    const next = current.filter(el => el.id !== elementId)
+    if (next.length === current.length) return // nothing removed
+    writeElements(slideIdx, variant, next)
+  }
+
+  return {
+    resolveElements, patchElement, writeElements,
+    addElement, removeElement,
+    resetSlide, setVariant, isOverridden,
+  }
 }
 
 // Structural equality — used to drop overrides that have been edited back to

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SlideElement, DeviceElement, CaptionElement, Anchor } from '~/utils/types'
+import type { SlideElement, DeviceElement, CaptionElement, IconElement, Anchor } from '~/utils/types'
 import type { DeviceFrame } from '~/utils/canvas'
 import { DEVICE_WIDTH_FNS } from '~/utils/canvas'
 import { anchorSides, anchorTransform, combineTransform, dragDeltaToPatch } from '~/utils/anchor'
@@ -25,10 +25,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'element-change': [payload: { id: string, patch: Partial<SlideElement> }]
+  'element-delete': [id: string]
 }>()
 
-type DraggableElement = DeviceElement | CaptionElement
-const draggableElements = computed(() => props.elements.filter((e): e is DraggableElement => e.type === 'device' || e.type === 'caption'))
+type DraggableElement = DeviceElement | CaptionElement | IconElement
+const draggableElements = computed(() => props.elements.filter((e): e is DraggableElement => e.type === 'device' || e.type === 'caption' || e.type === 'icon'))
 
 // Template ref to the overlay container — its rect IS the canvas's rendered
 // pixel size, which is what we need to convert screen-px drag deltas into
@@ -58,11 +59,17 @@ function deviceHeightPct(el: DeviceElement): number {
 const CAPTION_HEIGHT_PCT = 14
 
 function widthPctOf(el: DraggableElement): number {
-  return el.type === 'device' ? deviceWidthPct(el) : (el.widthPct ?? 80)
+  if (el.type === 'device') return deviceWidthPct(el)
+  if (el.type === 'caption') return el.widthPct ?? 80
+  return el.sizePct // icon: sizePct already represents width as % of canvas
 }
 
 function heightPctOf(el: DraggableElement): number {
-  return el.type === 'device' ? deviceHeightPct(el) : CAPTION_HEIGHT_PCT
+  if (el.type === 'device') return deviceHeightPct(el)
+  if (el.type === 'caption') return CAPTION_HEIGHT_PCT
+  // Icon is rendered as a square in canvas px (sizePct% of cW for both axes),
+  // so as a % of cH it's sizePct * cW / cH.
+  return el.sizePct * props.cW / props.cH
 }
 
 // Resize bounds.
@@ -73,7 +80,8 @@ const CAPTION_MAX_W = 100
 
 function clampWidth(el: DraggableElement, w: number): number {
   if (el.type === 'device') return Math.max(DEVICE_MIN_W, Math.min(DEVICE_MAX_W, w))
-  return Math.max(CAPTION_MIN_W, Math.min(CAPTION_MAX_W, w))
+  if (el.type === 'caption') return Math.max(CAPTION_MIN_W, Math.min(CAPTION_MAX_W, w))
+  return Math.max(5, Math.min(40, w)) // icon
 }
 
 const DEVICE_HANDLES = ['nw', 'ne', 'se', 'sw'] as const
@@ -81,7 +89,9 @@ const CAPTION_HANDLES = ['w', 'e'] as const
 type HandleId = (typeof DEVICE_HANDLES)[number] | (typeof CAPTION_HANDLES)[number]
 
 function handlesFor(el: DraggableElement): readonly HandleId[] {
-  return el.type === 'device' ? DEVICE_HANDLES : CAPTION_HANDLES
+  if (el.type === 'caption') return CAPTION_HANDLES
+  if (el.type === 'icon') return [] // move + delete only for now
+  return DEVICE_HANDLES
 }
 
 // Anchor of the corner OPPOSITE the grabbed handle. The element's anchor is
@@ -515,6 +525,35 @@ function hintLabel(el: DraggableElement): string {
       >
         ⟳
       </div>
+
+      <!-- Delete button — small ✕ on the element's top-right corner so the
+           user can remove an added element without leaving the canvas. -->
+      <button
+        type="button"
+        :style="{
+          position: 'absolute',
+          top: '0', right: '0',
+          width: '56px', height: '56px',
+          transform: 'translate(50%, -50%)',
+          background: '#dc2626',
+          border: '6px solid white',
+          borderRadius: '50%',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          cursor: 'pointer',
+          color: 'white',
+          fontSize: '36px',
+          fontWeight: '700',
+          lineHeight: '1',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }"
+        class="opacity-0 group-hover/handle:opacity-100 transition-opacity"
+        :class="drag?.id === el.id ? '!opacity-100' : ''"
+        title="Remove this element"
+        @pointerdown.stop
+        @click.stop="emit('element-delete', el.id)"
+      >
+        ×
+      </button>
 
       <!-- Visual tether between rotate handle and element top, so the
            interaction is legible from a glance. -->

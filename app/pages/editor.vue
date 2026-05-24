@@ -114,7 +114,47 @@ function exitFocus() { focusedSlideIdx.value = null }
 
 // Read/write helper for the per-slide elements[] override. Used by the
 // transform overlay's element-change events.
-const { patchElement, resetSlide, setVariant, isOverridden } = useElementOverride(config, updateConfig)
+const { patchElement, addElement, removeElement, resetSlide, setVariant, isOverridden } = useElementOverride(config, updateConfig)
+
+// Element factories — used by the focused header's "+ Add" buttons. Each new
+// element gets a unique id (type + random suffix) and a sensible default
+// placement (centered on the canvas) so the user can immediately drag it
+// where they want.
+function uid(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function addDevice(slideIdx: number) {
+  const variant = resolveVariant(slideIdx)
+  addElement(slideIdx, variant, {
+    id: uid('device'), type: 'device',
+    imageIdx: 0, widthRole: 'primary',
+    x: 50, y: 50, anchor: 'c',
+    zIndex: 5,
+  })
+}
+function addCaption(slideIdx: number) {
+  const variant = resolveVariant(slideIdx)
+  addElement(slideIdx, variant, {
+    id: uid('caption'), type: 'caption',
+    x: 50, y: 50, anchor: 'c',
+    widthPct: 70,
+    zIndex: 10,
+  })
+}
+function addIcon(slideIdx: number) {
+  const variant = resolveVariant(slideIdx)
+  addElement(slideIdx, variant, {
+    id: uid('icon'), type: 'icon',
+    x: 50, y: 50, anchor: 'c',
+    sizePct: 18,
+    zIndex: 6,
+  })
+}
+function onElementDelete(slideIdx: number, elementId: string) {
+  const variant = resolveVariant(slideIdx)
+  removeElement(slideIdx, variant, elementId)
+}
 
 // Each slide picks its variant from either a per-slide override
 // (SlideCopy.variant) or the positional default (slideVariants[i]). Used by
@@ -986,6 +1026,27 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 </div>
               </div>
               <div class="flex items-center gap-2 shrink-0">
+                <!-- Add element — dropdown of element types the user can drop
+                     onto the slide. Each lands centered on the canvas with
+                     sensible defaults and can be immediately dragged. -->
+                <UDropdownMenu
+                  :items="[
+                    { label: 'Device frame', icon: 'i-lucide-smartphone', onSelect: () => addDevice(focusedSlideIdx!) },
+                    { label: 'Caption text', icon: 'i-lucide-type', onSelect: () => addCaption(focusedSlideIdx!) },
+                    { label: 'App icon', icon: 'i-lucide-image', onSelect: () => addIcon(focusedSlideIdx!) },
+                  ]"
+                >
+                  <UButton
+                    size="sm"
+                    color="neutral"
+                    variant="outline"
+                    icon="i-lucide-plus"
+                    trailing-icon="i-lucide-chevron-down"
+                  >
+                    Add
+                  </UButton>
+                </UDropdownMenu>
+
                 <!-- Layout variant picker — swap which of the 10 baseline
                      layouts this slide uses. Changing variant clears any
                      existing element overrides since they belong to the old
@@ -1051,6 +1112,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   @export="exportOne(focusedSlideIdx)"
                   @edit="openEdit(focusedSlideIdx)"
                   @element-change="(p: { id: string, patch: Partial<SlideElement> }) => onElementChange(focusedSlideIdx!, p)"
+                  @element-delete="(id: string) => onElementDelete(focusedSlideIdx!, id)"
                 />
               </div>
             </div>
