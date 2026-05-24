@@ -104,6 +104,15 @@ function saveEdit() {
   editingSlide.value = null
 }
 
+// Focused canvas — one slide blown up in the center, thumb strip beneath for
+// quick switching. Entered via the maximize button on each SlideCard's hover
+// overlay or by clicking a thumbnail. Exit with ESC or the close button. The
+// device transform handles (Phase 2b) will live inside this mode only — the
+// grid stays read-only-ish to keep multi-slide review fast.
+const focusedSlideIdx = ref<number | null>(null)
+function enterFocus(i: number) { focusedSlideIdx.value = i }
+function exitFocus() { focusedSlideIdx.value = null }
+
 function setSlidePosition(i: number, value: { dx: number, dy: number } | null) {
   const next = [...config.value.copy]
   const current = next[i] || { label: '', headline: '' }
@@ -612,6 +621,7 @@ function onKeydown(e: KeyboardEvent) {
   }
   if (e.key === 'Escape') {
     if (editingSlide.value !== null) editingSlide.value = null
+    else if (focusedSlideIdx.value !== null) exitFocus()
   }
 }
 
@@ -910,8 +920,100 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 :device-frame="deviceFrame"
                 @export="exportOne(i)"
                 @edit="openEdit(i)"
+                @focus="enterFocus(i)"
                 @position="(v: { dx: number, dy: number } | null) => setSlidePosition(i, v)"
               />
+            </div>
+          </div>
+
+          <!-- Focused canvas mode — single slide front-and-center, thumb strip
+               beneath for quick switching. Hosts the Phase 2b transform UI
+               (resize/move/rotate device frame). Layered above the grid so we
+               can dismiss without losing scroll position or grid state. -->
+          <div
+            v-if="focusedSlideIdx !== null"
+            class="absolute inset-0 z-30 bg-gray-100 flex flex-col"
+          >
+            <!-- Header: close + title + per-slide actions -->
+            <div class="shrink-0 flex items-center justify-between gap-3 px-5 py-3 bg-white border-b border-gray-200">
+              <div class="flex items-center gap-3 min-w-0">
+                <UButton
+                  size="sm"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-x"
+                  aria-label="Close focused view"
+                  title="Exit focused view (Esc)"
+                  @click="exitFocus"
+                >
+                  Close
+                </UButton>
+                <div class="text-sm font-semibold text-gray-700 truncate">
+                  Slide {{ String(focusedSlideIdx + 1).padStart(2, '0') }}
+                  <span class="text-gray-400 font-normal">
+                    · {{ config.copy[focusedSlideIdx]?.label || `Slide ${focusedSlideIdx + 1}` }}
+                  </span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <UButton
+                  size="sm"
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-pencil"
+                  @click="openEdit(focusedSlideIdx)"
+                >
+                  Edit copy
+                </UButton>
+                <UButton
+                  size="sm"
+                  icon="i-lucide-download"
+                  :loading="!!exporting"
+                  :disabled="!!exporting"
+                  @click="exportOne(focusedSlideIdx)"
+                >
+                  Download
+                </UButton>
+              </div>
+            </div>
+
+            <!-- Centered large slide preview. Reuses SlideCard for the same
+                 hover affordances; the wider container makes its ResizeObserver
+                 scale the slide up automatically. -->
+            <div class="flex-1 min-h-0 flex items-center justify-center p-6 overflow-hidden">
+              <div
+                class="h-full"
+                :style="{ aspectRatio: `${canvasDims.cW}/${canvasDims.cH}`, maxWidth: '100%' }"
+              >
+                <SlideCard
+                  :index="focusedSlideIdx"
+                  :variant="slideVariants[focusedSlideIdx] ?? 1"
+                  :cfg="slideConfig"
+                  :c-w="canvasDims.cW"
+                  :c-h="canvasDims.cH"
+                  :label="config.copy[focusedSlideIdx]?.label || `Slide ${focusedSlideIdx + 1}`"
+                  :device-frame="deviceFrame"
+                  @export="exportOne(focusedSlideIdx)"
+                  @edit="openEdit(focusedSlideIdx)"
+                  @position="(v: { dx: number, dy: number } | null) => setSlidePosition(focusedSlideIdx!, v)"
+                />
+              </div>
+            </div>
+
+            <!-- Thumb strip — same pattern as the grid view header so muscle
+                 memory carries over. Click to jump to a different slide. -->
+            <div class="shrink-0 bg-white border-t border-gray-200 px-5 py-2 flex gap-1.5 overflow-x-auto">
+              <button
+                v-for="(_, i) in slideVariants"
+                :key="`focused-thumb-${i}`"
+                class="shrink-0 px-2.5 py-1 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors flex items-center gap-1.5"
+                :class="i === focusedSlideIdx ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-600'"
+                :title="`Switch to slide ${i + 1}`"
+                @click="enterFocus(i)"
+              >
+                <span class="text-gray-400 font-mono">{{ String(i + 1).padStart(2, '0') }}</span>
+                <span class="truncate max-w-[110px]">{{ config.copy[i]?.label || `Slide ${i + 1}` }}</span>
+              </button>
             </div>
           </div>
 
