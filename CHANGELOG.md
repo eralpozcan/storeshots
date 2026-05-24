@@ -6,6 +6,55 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-05-24
+
+### Added
+- **Layout customization — focused canvas with full transform controls**.
+  Each slide can now be repositioned, resized, and rotated freely instead
+  of being locked to a fixed template. Closes the most-asked feature
+  request (issue #5).
+  - **Focused canvas mode** — clicking the new ✥ "Edit layout" button on
+    any slide opens a single-slide editor that takes over the canvas
+    area. Thumb strip at the bottom for quick jumping between slides;
+    ESC or the Close button returns to the grid.
+  - **Move drag** — grab any device frame or caption to reposition it.
+    Holding Shift locks motion to the dominant axis; release within 2%
+    of canvas center, edges, or the element's original position to snap
+    magnetically. Alt suppresses snap for fine positioning.
+  - **Figma-style resize** — devices get 4 aspect-locked corner handles,
+    captions get E/W edge handles. The opposite corner stays fixed
+    while the grabbed handle follows the cursor (the element's anchor
+    migrates on pointerdown so subsequent renders inherit the new
+    pinning). Widths snap to 25/50/75/100% and the original value.
+  - **Free rotation** — a ⟳ handle above each element rotates around
+    its center. Holding Shift snaps to 15° increments for clean
+    angles. Available on devices and captions.
+  - **Layout variant picker** — focused header has a dropdown of all
+    10 baseline variants with one-line descriptions. Switching variant
+    drops any element/position overrides since they belong to the old
+    layout.
+  - **Add and remove elements** — focused header's "+ Add" dropdown
+    inserts a Device frame, Caption text, or App icon centered on the
+    canvas. Each element gets a red × button on hover to remove it.
+  - **Reset Layout** — single header button wipes elements + variant +
+    position back to the slide's default. Always rendered (disabled
+    when there's nothing to reset) so the escape hatch is discoverable.
+
+### Internal
+- Replaced the 10 hardcoded variant branches in `SlideTemplate.vue`
+  with a data-driven iteration over a `SlideElement[]` discriminated
+  union (device / caption / blob / icon). The original variants live
+  on as `VARIANT_PRESETS` in `canvas.ts` for backwards compatibility;
+  blobs and backgrounds stay slide-level for this phase since they
+  have no planned per-element UI.
+- New `useElementOverride` composable centralizes the read/write
+  bookkeeping: clones the preset on first edit, drops overrides
+  cleanly when they match the preset again, and handles the
+  variant-change cascade.
+- New `app/utils/anchor.ts` exposes the anchor → CSS-sides /
+  transform math shared between the renderer and the transform
+  overlay so positioning stays bit-identical.
+
 ## [0.7.0] — 2026-05-24
 
 ### Added
@@ -283,6 +332,7 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
+[0.8.0]: https://github.com/eralpozcan/storeshots/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/eralpozcan/storeshots/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/eralpozcan/storeshots/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/eralpozcan/storeshots/compare/v0.6.1...v0.6.2

@@ -2,7 +2,7 @@
 import type { ComponentPublicInstance } from 'vue'
 import { toPng, getFontEmbedCSS } from 'html-to-image'
 import JSZip from 'jszip'
-import type { Device, Orientation } from '~/utils/types'
+import type { Device, Orientation, SlideElement } from '~/utils/types'
 import { FGW, FGH, STORE_PRESETS } from '~/utils/canvas'
 import type { StorePreset, PresetTarget } from '~/utils/canvas'
 import { SLIDE_COUNT_APPLE, SLIDE_COUNT_ANDROID, DEFAULT_CONFIG } from '~/utils/defaults'
@@ -104,18 +104,89 @@ function saveEdit() {
   editingSlide.value = null
 }
 
-function setSlidePosition(i: number, value: { dx: number, dy: number } | null) {
-  const next = [...config.value.copy]
-  const current = next[i] || { label: '', headline: '' }
-  if (value === null) {
-    const { position, ...rest } = current
-    next[i] = rest
-  }
-  else {
-    next[i] = { ...current, position: value }
-  }
-  updateConfig({ copy: next })
+// Focused canvas — one slide blown up in the center, thumb strip beneath for
+// quick switching. Entered via the maximize button on each SlideCard's hover
+// overlay or by clicking a thumbnail. Exit with ESC or the close button.
+// Device transform handles live in this mode only.
+const focusedSlideIdx = ref<number | null>(null)
+function enterFocus(i: number) { focusedSlideIdx.value = i }
+function exitFocus() { focusedSlideIdx.value = null }
+
+// Read/write helper for the per-slide elements[] override. Used by the
+// transform overlay's element-change events.
+const { patchElement, addElement, removeElement, resetSlide, setVariant, isOverridden } = useElementOverride(config, updateConfig)
+
+// Element factories — used by the focused header's "+ Add" buttons. Each new
+// element gets a unique id (type + random suffix) and a sensible default
+// placement (centered on the canvas) so the user can immediately drag it
+// where they want.
+function uid(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 8)}`
 }
+
+function addDevice(slideIdx: number) {
+  const variant = resolveVariant(slideIdx)
+  addElement(slideIdx, variant, {
+    id: uid('device'), type: 'device',
+    imageIdx: 0, widthRole: 'primary',
+    x: 50, y: 50, anchor: 'c',
+    zIndex: 5,
+  })
+}
+function addCaption(slideIdx: number) {
+  const variant = resolveVariant(slideIdx)
+  addElement(slideIdx, variant, {
+    id: uid('caption'), type: 'caption',
+    x: 50, y: 50, anchor: 'c',
+    widthPct: 70,
+    zIndex: 10,
+  })
+}
+function addIcon(slideIdx: number) {
+  const variant = resolveVariant(slideIdx)
+  addElement(slideIdx, variant, {
+    id: uid('icon'), type: 'icon',
+    x: 50, y: 50, anchor: 'c',
+    sizePct: 18,
+    zIndex: 6,
+  })
+}
+function onElementDelete(slideIdx: number, elementId: string) {
+  const variant = resolveVariant(slideIdx)
+  removeElement(slideIdx, variant, elementId)
+}
+
+// Each slide picks its variant from either a per-slide override
+// (SlideCopy.variant) or the positional default (slideVariants[i]). Used by
+// both the grid and focused-mode renders.
+function resolveVariant(i: number): number {
+  return config.value.copy[i]?.variant ?? slideVariants.value[i] ?? 1
+}
+
+function onElementChange(slideIdx: number, payload: { id: string, patch: Partial<SlideElement> }) {
+  const variant = resolveVariant(slideIdx)
+  patchElement(slideIdx, variant, payload.id, payload.patch)
+}
+
+// Layout picker for the focused header — exposes all 10 variants with a
+// short description so users can swap layout without leaving the canvas.
+const VARIANT_OPTIONS: { value: number, label: string, desc: string }[] = [
+  { value: 1,  label: 'V1', desc: 'Centered device, caption top' },
+  { value: 2,  label: 'V2', desc: 'Two phones (back tilted left), caption top' },
+  { value: 3,  label: 'V3', desc: 'Device top-right, caption bottom-left' },
+  { value: 4,  label: 'V4', desc: 'Dark gradient, centered device' },
+  { value: 5,  label: 'V5', desc: 'Centered device, accent shadow' },
+  { value: 6,  label: 'V6', desc: 'Two phones (back tilted right), caption top' },
+  { value: 7,  label: 'V7', desc: 'Centered device (alt screenshot slot)' },
+  { value: 8,  label: 'V8', desc: 'Device top-right, caption bottom-left (alt)' },
+  { value: 9,  label: 'V9', desc: 'Dark gradient, centered device (alt)' },
+  { value: 10, label: 'V10', desc: 'Trust slide — app icon, no device frame' },
+]
+function pickVariant(slideIdx: number, variant: number) {
+  const positional = slideVariants.value[slideIdx] ?? 1
+  setVariant(slideIdx, variant, positional)
+}
+
 
 // Hidden file input wired to importProject
 const importInputRef = ref<HTMLInputElement | null>(null)
@@ -612,6 +683,7 @@ function onKeydown(e: KeyboardEvent) {
   }
   if (e.key === 'Escape') {
     if (editingSlide.value !== null) editingSlide.value = null
+    else if (focusedSlideIdx.value !== null) exitFocus()
   }
 }
 
@@ -827,7 +899,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </div>
 
       <!-- Preview area -->
-      <div class="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100">
+      <div class="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100 relative">
         <!-- Feature graphic -->
         <div
           v-if="device === 'feature-graphic'"
@@ -860,6 +932,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <!-- Slide grid -->
         <template v-else>
+          <!-- Grid mode (default) -->
+          <template v-if="focusedSlideIdx === null">
           <!-- Empty-state hint: shown until the user uploads their first screenshot. -->
           <div
             v-if="!hasAnyImages"
@@ -902,7 +976,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             >
               <SlideCard
                 :index="i"
-                :variant="v"
+                :variant="resolveVariant(i)"
                 :cfg="slideConfig"
                 :c-w="canvasDims.cW"
                 :c-h="canvasDims.cH"
@@ -910,8 +984,153 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 :device-frame="deviceFrame"
                 @export="exportOne(i)"
                 @edit="openEdit(i)"
-                @position="(v: { dx: number, dy: number } | null) => setSlidePosition(i, v)"
+                @focus="enterFocus(i)"
               />
+            </div>
+          </div>
+
+          </template>
+
+          <!-- Focused canvas mode — replaces the grid entirely so it owns the
+               full canvas area. Inline (not absolute overlay) so scroll
+               position and content height don't interact. -->
+          <div
+            v-else
+            class="h-full flex flex-col bg-gray-100"
+          >
+            <!-- Header: close + title + per-slide actions -->
+            <div class="shrink-0 flex items-center justify-between gap-3 px-5 py-3 bg-white border-b border-gray-200">
+              <div class="flex items-center gap-3 min-w-0">
+                <UButton
+                  size="sm"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-x"
+                  aria-label="Close focused view"
+                  title="Exit focused view (Esc)"
+                  @click="exitFocus"
+                >
+                  Close
+                </UButton>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-gray-700 truncate">
+                    Slide {{ String(focusedSlideIdx + 1).padStart(2, '0') }}
+                    <span class="text-gray-400 font-normal">
+                      · {{ config.copy[focusedSlideIdx]?.label || `Slide ${focusedSlideIdx + 1}` }}
+                    </span>
+                  </div>
+                  <div class="text-[11px] text-blue-600 mt-0.5 flex items-center gap-1">
+                    <UIcon name="i-lucide-move" class="size-3" />
+                    Drag the device frame or caption to reposition
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <!-- Add element — dropdown of element types the user can drop
+                     onto the slide. Each lands centered on the canvas with
+                     sensible defaults and can be immediately dragged. -->
+                <UDropdownMenu
+                  :items="[
+                    { label: 'Device frame', icon: 'i-lucide-smartphone', onSelect: () => addDevice(focusedSlideIdx!) },
+                    { label: 'Caption text', icon: 'i-lucide-type', onSelect: () => addCaption(focusedSlideIdx!) },
+                    { label: 'App icon', icon: 'i-lucide-image', onSelect: () => addIcon(focusedSlideIdx!) },
+                  ]"
+                >
+                  <UButton
+                    size="sm"
+                    color="neutral"
+                    variant="outline"
+                    icon="i-lucide-plus"
+                    trailing-icon="i-lucide-chevron-down"
+                  >
+                    Add
+                  </UButton>
+                </UDropdownMenu>
+
+                <!-- Layout variant picker — swap which of the 10 baseline
+                     layouts this slide uses. Changing variant clears any
+                     existing element overrides since they belong to the old
+                     layout's element set. -->
+                <USelect
+                  :model-value="resolveVariant(focusedSlideIdx)"
+                  :items="VARIANT_OPTIONS.map(o => ({ label: `${o.label} — ${o.desc}`, value: o.value }))"
+                  value-key="value"
+                  label-key="label"
+                  size="sm"
+                  class="min-w-[280px]"
+                  @update:model-value="(v: number) => pickVariant(focusedSlideIdx!, v)"
+                />
+                <UButton
+                  size="sm"
+                  :color="isOverridden(focusedSlideIdx) ? 'error' : 'neutral'"
+                  variant="ghost"
+                  icon="i-lucide-rotate-ccw"
+                  :disabled="!isOverridden(focusedSlideIdx)"
+                  :title="isOverridden(focusedSlideIdx) ? 'Restore default layout for this slide' : 'No custom layout to reset'"
+                  @click="resetSlide(focusedSlideIdx)"
+                >
+                  Reset layout
+                </UButton>
+                <UButton
+                  size="sm"
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-pencil"
+                  @click="openEdit(focusedSlideIdx)"
+                >
+                  Edit copy
+                </UButton>
+                <UButton
+                  size="sm"
+                  icon="i-lucide-download"
+                  :loading="!!exporting"
+                  :disabled="!!exporting"
+                  @click="exportOne(focusedSlideIdx)"
+                >
+                  Download
+                </UButton>
+              </div>
+            </div>
+
+            <!-- Centered large slide preview. Reuses SlideCard for the same
+                 hover affordances; the wider container makes its ResizeObserver
+                 scale the slide up automatically. -->
+            <div class="flex-1 min-h-0 flex items-center justify-center p-6 overflow-hidden">
+              <div
+                class="h-full"
+                :style="{ aspectRatio: `${canvasDims.cW}/${canvasDims.cH}`, maxWidth: '100%' }"
+              >
+                <SlideCard
+                  :index="focusedSlideIdx"
+                  :variant="resolveVariant(focusedSlideIdx)"
+                  :cfg="slideConfig"
+                  :c-w="canvasDims.cW"
+                  :c-h="canvasDims.cH"
+                  :label="config.copy[focusedSlideIdx]?.label || `Slide ${focusedSlideIdx + 1}`"
+                  :device-frame="deviceFrame"
+                  :transform-mode="true"
+                  @export="exportOne(focusedSlideIdx)"
+                  @edit="openEdit(focusedSlideIdx)"
+                  @element-change="(p: { id: string, patch: Partial<SlideElement> }) => onElementChange(focusedSlideIdx!, p)"
+                  @element-delete="(id: string) => onElementDelete(focusedSlideIdx!, id)"
+                />
+              </div>
+            </div>
+
+            <!-- Thumb strip — same pattern as the grid view header so muscle
+                 memory carries over. Click to jump to a different slide. -->
+            <div class="shrink-0 bg-white border-t border-gray-200 px-5 py-2 flex gap-1.5 overflow-x-auto">
+              <button
+                v-for="(_, i) in slideVariants"
+                :key="`focused-thumb-${i}`"
+                class="shrink-0 px-2.5 py-1 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors flex items-center gap-1.5"
+                :class="i === focusedSlideIdx ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-600'"
+                :title="`Switch to slide ${i + 1}`"
+                @click="enterFocus(i)"
+              >
+                <span class="text-gray-400 font-mono">{{ String(i + 1).padStart(2, '0') }}</span>
+                <span class="truncate max-w-[110px]">{{ config.copy[i]?.label || `Slide ${i + 1}` }}</span>
+              </button>
             </div>
           </div>
 
