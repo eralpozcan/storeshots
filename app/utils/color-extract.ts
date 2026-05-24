@@ -54,11 +54,11 @@ async function topColors(src: string, n = 6): Promise<Rgb[]> {
 
   const buckets = new Map<string, Rgb>()
   for (let i = 0; i < data.length; i += 4) {
-    const a = data[i + 3]
+    const a = data[i + 3]!
     if (a < 200) continue
-    const r = quantize(data[i])
-    const g = quantize(data[i + 1])
-    const b = quantize(data[i + 2])
+    const r = quantize(data[i]!)
+    const g = quantize(data[i + 1]!)
+    const b = quantize(data[i + 2]!)
     const key = `${r},${g},${b}`
     const existing = buckets.get(key)
     if (existing) existing.count++
@@ -115,7 +115,7 @@ export async function extractPalette(images: (string | null)[]): Promise<BrandCo
   const ranked = [...merged.values()].sort((a, b) => b.count - a.count)
   if (!ranked.length) return null
 
-  const primary = ranked[0]
+  const primary = ranked[0]!
   // Pick an accent that's visually distinct from primary.
   const accent = ranked.slice(1).find((c) => {
     const dr = Math.abs(c.r - primary.r)

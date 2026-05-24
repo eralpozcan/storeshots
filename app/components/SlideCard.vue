@@ -31,6 +31,7 @@ let ro: ResizeObserver | null = null
 onMounted(() => {
   if (!cardRef.value) return
   ro = new ResizeObserver(([e]) => {
+    if (!e) return
     scale.value = e.contentRect.width / props.cW
   })
   ro.observe(cardRef.value)
