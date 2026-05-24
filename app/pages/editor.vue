@@ -833,7 +833,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </div>
 
       <!-- Preview area -->
-      <div class="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100">
+      <div class="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100 relative">
         <!-- Feature graphic -->
         <div
           v-if="device === 'feature-graphic'"
@@ -958,12 +958,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               </div>
               <div class="flex items-center gap-2 shrink-0">
                 <UButton
-                  v-if="isOverridden(focusedSlideIdx)"
                   size="sm"
-                  color="neutral"
+                  :color="isOverridden(focusedSlideIdx) ? 'error' : 'neutral'"
                   variant="ghost"
                   icon="i-lucide-rotate-ccw"
-                  title="Restore default layout for this slide"
+                  :disabled="!isOverridden(focusedSlideIdx)"
+                  :title="isOverridden(focusedSlideIdx) ? 'Restore default layout for this slide' : 'No custom layout to reset'"
                   @click="resetSlide(focusedSlideIdx)"
                 >
                   Reset layout

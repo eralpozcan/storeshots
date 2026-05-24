@@ -194,15 +194,25 @@ function onPointerMove(e: PointerEvent) {
   }
   else {
     const grow = HANDLE_GROW[drag.value.handle]
-    // Project drag onto the grow axis and convert to canvas-width %.
-    // Diagonal handles use a half-and-half combine so they feel uniform.
+    // Project the drag onto the handle's grow axis. Corner handles take the
+    // average of x and y projections so diagonal motion reads naturally.
+    // Edge handles use a single axis directly.
     const screenGrow = grow.sy === 0
       ? dxScreen * grow.sx
       : (dxScreen * grow.sx + dyScreen * grow.sy) / 2
-    const widthDeltaPct = (screenGrow / rect.width) * 100 * 2 // ×2: handle on edge, but grow happens from anchor; double for parity with cursor distance
+    // Convert screen-pixel grow into canvas-% width change. 1:1 mapping so
+    // a 50px drag on a 500px-wide rendered slide changes widthPct by 10pts.
+    const widthDeltaPct = (screenGrow / rect.width) * 100
     livePatch.value = { id: drag.value.id, dx: 0, dy: 0, widthDelta: widthDeltaPct }
   }
 }
+
+// Position clamps. Allow slight over-edge so the variant layouts that peek
+// past the canvas (device at y: -4 etc.) still work, but stop users from
+// flinging elements completely off-screen with no way to find them.
+const POS_MIN = -30
+const POS_MAX = 130
+function clampPos(v: number): number { return Math.max(POS_MIN, Math.min(POS_MAX, v)) }
 
 function onPointerUp(e: PointerEvent) {
   if (!drag.value) return
@@ -213,7 +223,7 @@ function onPointerUp(e: PointerEvent) {
       if (el) {
         emit('element-change', {
           id: drag.value.id,
-          patch: { x: el.x + live.dx, y: el.y + live.dy },
+          patch: { x: clampPos(el.x + live.dx), y: clampPos(el.y + live.dy) },
         })
       }
     }
