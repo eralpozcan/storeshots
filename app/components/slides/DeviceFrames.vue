@@ -5,7 +5,7 @@ defineProps<{
   type: 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad'
   src: string
   alt?: string
-  style?: Record<string, string>
+  style?: Record<string, string | undefined>
 }>()
 
 const { mockupUrl } = useMockup()

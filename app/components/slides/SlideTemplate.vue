@@ -1,39 +1,27 @@
 <script setup lang="ts">
 import type { SlideConfig } from '~/utils/types'
-import { PLACEHOLDER_IMG } from '~/utils/defaults'
-import { MK_RATIO, phoneW, phoneW2, tabletPW, tabletPW2, tabletLW, ipadW, ipadW2, TAB_P_RATIO, TAB_L_RATIO, IPAD_RATIO } from '~/utils/canvas'
+import type { DeviceFrame } from '~/utils/canvas'
+import { VARIANT_PRESETS } from '~/utils/canvas'
 
 const props = defineProps<{
   variant: number // 1-10
   cfg: SlideConfig
   cW: number
   cH: number
-  deviceFrame: 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad'
+  deviceFrame: DeviceFrame
   // Live drag preview from SlideCard's adjust mode. Wins over copy.position.
   positionOverride?: { dx: number, dy: number } | null
 }>()
 
-function imgSrc(v: string | null | undefined) { return v || PLACEHOLDER_IMG }
+// Each variant maps to a slot in cfg.copy. Variants 1-9 use copy[variant-1];
+// variant 10 (trust slide) uses copy[9].
+const slideIdx = computed(() => props.variant <= 9 ? props.variant - 1 : 9)
 
-const widthFns = computed(() => {
-  const d = props.deviceFrame
-  if (d === 'android-tablet-p') return { wf: tabletPW, wf2: tabletPW2, ratio: TAB_P_RATIO }
-  if (d === 'android-tablet-l') return { wf: tabletLW, wf2: tabletLW, ratio: TAB_L_RATIO }
-  if (d === 'ipad') return { wf: ipadW, wf2: ipadW2, ratio: IPAD_RATIO }
-  return { wf: phoneW, wf2: phoneW2, ratio: MK_RATIO }
-})
-
-const pw = computed(() => widthFns.value.wf(props.cW, props.cH) * 100)
-const pw2 = computed(() => widthFns.value.wf2(props.cW, props.cH) * 100)
-
-const copy = computed(() => {
-  const idx = props.variant <= 9 ? props.variant - 1 : 9
-  return props.cfg.copy[idx] ?? { label: '', headline: '' }
-})
-
+const copy = computed(() => props.cfg.copy[slideIdx.value] ?? { label: '', headline: '' })
 const c = computed(() => props.cfg.colors)
 
-// Background presets per slide
+// Background presets per slide. Kept inline because backgrounds are
+// slide-level (not per-element) and have no planned drag controls.
 const lightBgs: Record<number, string> = {
   1: 'linear-gradient(155deg,#EEF4FF 0%,#FFFAF5 55%,#FFF0E4 100%)',
   2: 'linear-gradient(155deg,#F0F7FF 0%,#FFFFFF 55%,#FFF8F2 100%)',
@@ -53,23 +41,50 @@ const bg = computed(() => {
 const isDark = computed(() => props.variant === 4 || props.variant === 9 || props.variant === 10)
 const textColor = computed(() => isDark.value ? c.value.textLight : c.value.textDark)
 
-// Caption position: most are top, slides 3 & 8 are bottom-left
-const captionPos = computed(() => {
-  if (props.variant === 3 || props.variant === 8) return 'bottom-left'
-  return 'top'
-})
-
-// User fine-tune offset, applied as an extra transform on the caption wrapper.
-// Falls back to the value persisted on the slide's copy entry.
-const captionTransform = computed(() => {
+// User fine-tune offset applied as an extra transform on the caption element.
+const captionTranslate = computed(() => {
   const p = props.positionOverride ?? copy.value.position ?? null
   if (!p || (p.dx === 0 && p.dy === 0)) return undefined
   return `translate(${p.dx}px, ${p.dy}px)`
 })
+
+// Element list — prefer per-slide override, else variant preset.
+const elements = computed(() => {
+  return copy.value.elements ?? VARIANT_PRESETS[props.variant] ?? VARIANT_PRESETS[1] ?? []
+})
+
+// Decorative blob params per variant — same math as the original variant
+// switch, kept intentionally inline (see VARIANT_PRESETS doc comment).
+const blob1Style = computed(() => {
+  const v = props.variant
+  const evenV = v % 2 === 0
+  return {
+    width: `${65 + (v % 3) * 10}%`,
+    height: `${65 + (v % 3) * 10}%`,
+    top: evenV ? '-20%' : '10%',
+    [evenV ? 'right' : 'left']: `-${10 + (v % 2) * 8}%`,
+  } as Record<string, string>
+})
+
+const blob2Style = computed(() => {
+  const v = props.variant
+  const evenV = v % 2 === 0
+  return {
+    width: `${50 + (v % 2) * 15}%`,
+    height: `${50 + (v % 2) * 15}%`,
+    bottom: '-5%',
+    [evenV ? 'left' : 'right']: `-${8 + (v % 3) * 2}%`,
+  } as Record<string, string>
+})
+
+const blob1Color = computed(() => props.variant % 2 === 0 ? c.value.primary : c.value.accent)
+const blob1Opacity = computed(() => isDark.value ? 0.18 : (props.variant === 1 ? 0.10 : 0.08 + (props.variant % 3) * 0.02))
+const blob2Color = computed(() => props.variant % 2 === 0 ? c.value.accent : c.value.primary)
+const blob2Opacity = computed(() => isDark.value ? 0.10 : 0.07 + (props.variant % 4) * 0.02)
 </script>
 
 <template>
-  <!-- Slide 10 = Trust slide (no device frame) -->
+  <!-- Slide 10 = Trust slide (no device frame, app icon centered) -->
   <div
     v-if="variant === 10"
     :style="{
@@ -92,13 +107,13 @@ const captionTransform = computed(() => {
       }"
       draggable="false"
     >
-    <div :style="{ textAlign: 'center', position: 'relative', zIndex: 5, padding: `0 ${cW * 0.1}px`, transform: captionTransform }">
+    <div :style="{ textAlign: 'center', position: 'relative', zIndex: 5, padding: `0 ${cW * 0.1}px`, transform: captionTranslate }">
       <SlideCaption :label="copy.label" :headline="copy.headline" :text-color="c.textLight" :label-color="c.accent" :c-w="cW" />
     </div>
     <div :style="{ position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)', width: `${cW * 0.14}px`, height: '3px', background: `linear-gradient(90deg,${c.primary},${c.accent})`, borderRadius: '2px', zIndex: 5 }" />
   </div>
 
-  <!-- Regular slides with device frame -->
+  <!-- Regular slides (1-9): data-driven element list over a variant background -->
   <div
     v-else
     :style="{
@@ -106,134 +121,22 @@ const captionTransform = computed(() => {
       background: bg, fontFamily: 'Inter,sans-serif'
     }"
   >
-    <!-- Blobs -->
-    <SlideBlob
-      :color="variant % 2 === 0 ? c.primary : c.accent"
-      :opacity="isDark ? 0.18 : (variant === 1 ? 0.10 : 0.08 + (variant % 3) * 0.02)"
-      :blob-style="{
-        width: `${65 + (variant % 3) * 10}%`, height: `${65 + (variant % 3) * 10}%`,
-        top: variant % 2 === 0 ? '-20%' : '10%',
-        [variant % 2 === 0 ? 'right' : 'left']: `-${10 + (variant % 2) * 8}%`
-      }"
-    />
-    <SlideBlob
-      :color="variant % 2 === 0 ? c.accent : c.primary"
-      :opacity="isDark ? 0.10 : 0.07 + (variant % 4) * 0.02"
-      :blob-style="{
-        width: `${50 + (variant % 2) * 15}%`, height: `${50 + (variant % 2) * 15}%`,
-        bottom: '-5%',
-        [variant % 2 === 0 ? 'left' : 'right']: `-${8 + (variant % 3) * 2}%`
-      }"
-    />
+    <!-- Decorative blobs (slide-level, not user-controllable in 2a) -->
+    <SlideBlob :color="blob1Color" :opacity="blob1Opacity" :blob-style="blob1Style" />
+    <SlideBlob :color="blob2Color" :opacity="blob2Opacity" :blob-style="blob2Style" />
 
-    <!-- Caption -->
-    <div
-      v-if="captionPos === 'top'"
-      :style="{ position: 'absolute', top: '6%', left: '10%', right: '10%', zIndex: 10, transform: captionTransform }"
-    >
-      <SlideCaption :label="copy.label" :headline="copy.headline" :text-color="textColor" :label-color="c.accent" :c-w="cW" />
-    </div>
-    <div
-      v-else
-      :style="{ position: 'absolute', bottom: cH > 2400 ? '10%' : '8%', left: '8%', right: '46%', zIndex: 10, transform: captionTransform }"
-    >
-      <SlideCaption :label="copy.label" :headline="copy.headline" :text-color="textColor" :label-color="c.accent" :c-w="cW" />
-    </div>
-
-    <!-- Device frame(s) -->
-    <!-- Slide 1: single centered bottom -->
-    <DeviceFrames
-      v-if="variant === 1"
-      :type="deviceFrame"
-      :src="imgSrc(cfg.images[0])"
-      alt="Screen 1"
-      :style="{ width: `${pw}%`, left: '50%', bottom: '-4%', transform: 'translateX(-50%)', filter: `drop-shadow(0 40px 80px ${c.primary}44)`, zIndex: '5' }"
-    />
-
-    <!-- Slide 2: two phones, bg phone faded left, main right -->
-    <template v-if="variant === 2">
-      <DeviceFrames
-        :type="deviceFrame"
-        :src="imgSrc(cfg.images[0])"
-        alt=""
-        :style="{ width: `${pw2 * 0.82}%`, left: '-5%', bottom: '-3%', transform: 'rotate(-5deg)', opacity: '0.45', filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.12))', zIndex: '3' }"
-      />
-      <DeviceFrames
-        :type="deviceFrame"
-        :src="imgSrc(cfg.images[1])"
-        alt="Screen 2"
-        :style="{ width: `${pw2}%`, right: '-3%', bottom: '-3%', filter: `drop-shadow(0 40px 80px ${c.primary}38)`, zIndex: '5' }"
-      />
-    </template>
-
-    <!-- Slide 3: phone top-right, caption bottom-left -->
-    <DeviceFrames
-      v-if="variant === 3"
-      :type="deviceFrame"
-      :src="imgSrc(cfg.images[2])"
-      alt="Screen 3"
-      :style="{ width: `${pw}%`, right: '-6%', top: '5%', filter: `drop-shadow(0 30px 70px ${c.primary}38)`, zIndex: '5' }"
-    />
-
-    <!-- Slide 4: dark bg, single centered bottom -->
-    <DeviceFrames
-      v-if="variant === 4"
-      :type="deviceFrame"
-      :src="imgSrc(cfg.images[3])"
-      alt="Screen 4"
-      :style="{ width: `${pw}%`, left: '50%', bottom: '-4%', transform: 'translateX(-50%)', filter: 'drop-shadow(0 40px 80px rgba(0,0,0,0.55))', zIndex: '5' }"
-    />
-
-    <!-- Slide 5: single centered bottom -->
-    <DeviceFrames
-      v-if="variant === 5"
-      :type="deviceFrame"
-      :src="imgSrc(cfg.images[4])"
-      alt="Screen 5"
-      :style="{ width: `${pw}%`, left: '50%', bottom: '-4%', transform: 'translateX(-50%)', filter: `drop-shadow(0 40px 80px ${c.accent}40)`, zIndex: '5' }"
-    />
-
-    <!-- Slide 6: two phones, bg right faded, main left -->
-    <template v-if="variant === 6">
-      <DeviceFrames
-        :type="deviceFrame"
-        :src="imgSrc(cfg.images[5])"
-        alt=""
-        :style="{ width: `${pw2 * 0.80}%`, right: '-5%', bottom: '-2%', transform: 'rotate(4deg)', opacity: '0.45', filter: 'drop-shadow(0 15px 30px rgba(0,0,0,0.10))', zIndex: '3' }"
-      />
-      <DeviceFrames
-        :type="deviceFrame"
-        :src="imgSrc(cfg.images[6])"
-        alt="Screen 6"
-        :style="{ width: `${pw2}%`, left: '-3%', bottom: '-3%', filter: `drop-shadow(0 40px 80px ${c.primary}33)`, zIndex: '5' }"
-      />
-    </template>
-
-    <!-- Slide 7: single centered bottom -->
-    <DeviceFrames
-      v-if="variant === 7"
-      :type="deviceFrame"
-      :src="imgSrc(cfg.images[6])"
-      alt="Screen 7"
-      :style="{ width: `${pw}%`, left: '50%', bottom: '-4%', transform: 'translateX(-50%)', filter: `drop-shadow(0 40px 80px ${c.primary}38)`, zIndex: '5' }"
-    />
-
-    <!-- Slide 8: phone top-right, caption bottom-left -->
-    <DeviceFrames
-      v-if="variant === 8"
-      :type="deviceFrame"
-      :src="imgSrc(cfg.images[7])"
-      alt="Screen 8"
-      :style="{ width: `${pw}%`, right: '-6%', top: '5%', filter: `drop-shadow(0 30px 70px ${c.primary}38)`, zIndex: '5' }"
-    />
-
-    <!-- Slide 9: dark bg, single centered bottom -->
-    <DeviceFrames
-      v-if="variant === 9"
-      :type="deviceFrame"
-      :src="imgSrc(cfg.images[8])"
-      alt="Screen 9"
-      :style="{ width: `${pw}%`, left: '50%', bottom: '-4%', transform: 'translateX(-50%)', filter: 'drop-shadow(0 40px 80px rgba(0,0,0,0.50))', zIndex: '5' }"
+    <!-- Element list -->
+    <SlideElementRenderer
+      v-for="el in elements"
+      :key="el.id"
+      :element="el"
+      :cfg="cfg"
+      :c-w="cW"
+      :c-h="cH"
+      :device-frame="deviceFrame"
+      :text-color="textColor"
+      :slide-idx="slideIdx"
+      :caption-translate="captionTranslate"
     />
   </div>
 </template>
