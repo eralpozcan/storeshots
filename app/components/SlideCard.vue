@@ -160,7 +160,7 @@ function cancelAdjust() {
 
       <!-- Hover overlay actions -->
       <button
-        v-if="!adjustMode"
+        v-if="!adjustMode && !transformMode"
         type="button"
         class="absolute top-2 left-2 size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
         title="Edit copy"
@@ -173,7 +173,7 @@ function cancelAdjust() {
         />
       </button>
       <button
-        v-if="!adjustMode"
+        v-if="!adjustMode && !transformMode"
         type="button"
         class="absolute top-2 left-12 size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
         title="Adjust caption position"
@@ -186,7 +186,7 @@ function cancelAdjust() {
         />
       </button>
       <button
-        v-if="!adjustMode"
+        v-if="!adjustMode && !transformMode"
         type="button"
         class="absolute top-2 left-[5.5rem] size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
         title="Focus this slide for layout edits"
@@ -199,7 +199,7 @@ function cancelAdjust() {
         />
       </button>
       <button
-        v-if="!adjustMode"
+        v-if="!adjustMode && !transformMode"
         type="button"
         class="absolute top-2 right-2 size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
         title="Download this slide as PNG"
