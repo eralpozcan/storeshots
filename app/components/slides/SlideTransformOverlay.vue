@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SlideElement, DeviceElement, CaptionElement } from '~/utils/types'
+import type { SlideElement, DeviceElement, CaptionElement, Anchor } from '~/utils/types'
 import type { DeviceFrame } from '~/utils/canvas'
 import { DEVICE_WIDTH_FNS } from '~/utils/canvas'
 import { anchorSides, anchorTransform, combineTransform, dragDeltaToPatch } from '~/utils/anchor'
@@ -9,14 +9,12 @@ import { anchorSides, anchorTransform, combineTransform, dragDeltaToPatch } from
 //   - move (drag element body)
 //   - resize devices via 4 corner handles (aspect-locked; height derived
 //     from the device frame ratio)
-//   - resize captions via E/W edge handles (horizontal only; height is
-//     auto-sized by the caption's text content)
+//   - resize captions via E/W edge handles (horizontal only)
 //
-// All drag types emit element-change with a partial patch. The element grows
-// FROM its anchor point — we don't migrate the anchor mid-drag, which keeps
-// the math simple and the visual behavior predictable for the variant layouts
-// (e.g. a bc-anchored device grows upward; a tr-anchored device grows
-// inward). A future "free transform" mode could swap anchor on the fly.
+// Resize uses Figma-style behavior: the OPPOSITE corner/edge of the grabbed
+// handle stays fixed while the grabbed end follows the cursor. Achieved by
+// migrating the element's anchor to the opposite corner on pointerdown and
+// then letting widthPct grow outward from the new anchor.
 
 const props = defineProps<{
   elements: SlideElement[]
@@ -31,6 +29,16 @@ const emit = defineEmits<{
 
 type DraggableElement = DeviceElement | CaptionElement
 const draggableElements = computed(() => props.elements.filter((e): e is DraggableElement => e.type === 'device' || e.type === 'caption'))
+
+// Template ref to the overlay container — its rect IS the canvas's rendered
+// pixel size, which is what we need to convert screen-px drag deltas into
+// canvas-% patches. Using e.currentTarget for this returned the handle's
+// rect (48×48) instead and made every interaction feel ~10× too sensitive.
+const overlayEl = ref<HTMLDivElement>()
+function canvasRect(): { width: number, height: number } {
+  const r = overlayEl.value?.getBoundingClientRect()
+  return { width: r?.width ?? props.cW, height: r?.height ?? props.cH }
+}
 
 // Width resolution — matches SlideElementRenderer so the hit area sits over
 // the rendered element exactly.
@@ -57,9 +65,7 @@ function heightPctOf(el: DraggableElement): number {
   return el.type === 'device' ? deviceHeightPct(el) : CAPTION_HEIGHT_PCT
 }
 
-// Resize bounds. Devices can shrink to a thumb-sized icon or balloon to 1.5×
-// the canvas (over-edge layouts use this); captions stay in a more
-// conservative range because tiny text is unreadable and wide text wraps oddly.
+// Resize bounds.
 const DEVICE_MIN_W = 10
 const DEVICE_MAX_W = 150
 const CAPTION_MIN_W = 20
@@ -70,8 +76,6 @@ function clampWidth(el: DraggableElement, w: number): number {
   return Math.max(CAPTION_MIN_W, Math.min(CAPTION_MAX_W, w))
 }
 
-// What handles a given element exposes. Devices get corners (aspect-locked),
-// captions get horizontal edges only.
 const DEVICE_HANDLES = ['nw', 'ne', 'se', 'sw'] as const
 const CAPTION_HANDLES = ['w', 'e'] as const
 type HandleId = (typeof DEVICE_HANDLES)[number] | (typeof CAPTION_HANDLES)[number]
@@ -80,65 +84,160 @@ function handlesFor(el: DraggableElement): readonly HandleId[] {
   return el.type === 'device' ? DEVICE_HANDLES : CAPTION_HANDLES
 }
 
-// Drag state — one active interaction at a time (move OR resize).
+// Anchor of the corner OPPOSITE the grabbed handle. The element's anchor is
+// migrated to this point on resize start, after which "grow outward from
+// anchor" naturally implements the Figma-style "opposite corner stays" rule.
+// Edge handles (E/W) for captions migrate horizontally only — caption y/anchor
+// vertical component is preserved by reusing the element's current vertical
+// anchor component.
+function oppositeAnchorFor(el: DraggableElement, handle: HandleId): Anchor {
+  if (el.type === 'device') {
+    switch (handle) {
+      case 'nw': return 'br'
+      case 'ne': return 'bl'
+      case 'se': return 'tl'
+      case 'sw': return 'tr'
+    }
+  }
+  // Caption: keep existing vertical anchor component, flip horizontal.
+  const vert = el.anchor.startsWith('t') ? 't' : el.anchor.startsWith('b') ? 'b' : 'c'
+  const newHoriz = handle === 'w' ? 'r' : 'l'
+  // 'cr' / 'cl' replaces 'c' alone if vert is center.
+  return (vert === 'c' ? `c${newHoriz}` : `${vert}${newHoriz}`) as Anchor
+}
+
+// Convert an element's (anchor, x, y, width, height) into absolute corner
+// positions in canvas % from the top-left. We need this to compute where the
+// "opposite corner" sits in absolute terms so we can re-anchor without
+// visually moving the element.
+function absoluteBox(el: DraggableElement): { left: number, top: number, width: number, height: number } {
+  const w = widthPctOf(el)
+  const h = heightPctOf(el)
+  // x → left (or right, depending on anchor's horizontal letter).
+  let left: number
+  if (el.anchor.endsWith('l') || el.anchor === 'c' || el.anchor === 'tc' || el.anchor === 'bc') {
+    if (el.anchor === 'tc' || el.anchor === 'bc' || el.anchor === 'c') {
+      // Centered anchors: x is the element's CENTER from the left.
+      left = el.x - w / 2
+    }
+    else {
+      // Left-aligned anchors ('tl', 'bl', 'cl'): x is the element's LEFT edge.
+      left = el.x
+    }
+  }
+  else {
+    // Right-aligned anchors: x is from the right edge.
+    left = 100 - el.x - w
+  }
+  let top: number
+  if (el.anchor.startsWith('t')) {
+    top = el.y
+  }
+  else if (el.anchor.startsWith('b')) {
+    top = 100 - el.y - h
+  }
+  else {
+    // Vertical-center anchors: y is element CENTER from the top.
+    top = el.y - h / 2
+  }
+  return { left, top, width: w, height: h }
+}
+
+// Given an absolute box + target anchor, compute the (x, y) that re-anchors
+// the element to that corner without visually moving it. Inverse of
+// absoluteBox for a chosen anchor.
+function xyForAnchor(box: { left: number, top: number, width: number, height: number }, anchor: Anchor): { x: number, y: number } {
+  const { left, top, width, height } = box
+  let x: number, y: number
+  if (anchor.endsWith('l') || anchor === 'tc' || anchor === 'bc' || anchor === 'c') {
+    x = (anchor === 'tc' || anchor === 'bc' || anchor === 'c') ? left + width / 2 : left
+  }
+  else {
+    x = 100 - left - width
+  }
+  if (anchor.startsWith('t')) y = top
+  else if (anchor.startsWith('b')) y = 100 - top - height
+  else y = top + height / 2
+  return { x, y }
+}
+
+// Drag state — one active interaction at a time. Resize carries a snapshot
+// of the migrated anchor + x/y so onPointerMove can layer width changes on
+// top during the drag without re-emitting the anchor every move.
 type DragState =
-  | { mode: 'move', id: string, startX: number, startY: number, origX: number, origY: number, anchor: SlideElement['anchor'] }
-  | { mode: 'resize', id: string, handle: HandleId, startX: number, startY: number, origWidthPct: number }
+  | { mode: 'move', id: string, startX: number, startY: number, origX: number, origY: number, anchor: Anchor }
+  | { mode: 'resize', id: string, handle: HandleId, startX: number, startY: number, origWidthPct: number,
+      migrated: { anchor: Anchor, x: number, y: number } }
 const drag = ref<DragState | null>(null)
 
-// Per-element live preview — applied on top of the element's saved values
-// while a drag is in flight, then cleared on commit/cancel.
-const livePatch = ref<{ id: string, dx: number, dy: number, widthDelta: number } | null>(null)
+// Per-element live preview applied on top of saved values while a drag is
+// in flight. For resize, also tracks the migrated anchor so the rendered
+// hit area uses it.
+const livePatch = ref<{
+  id: string, dx: number, dy: number, widthDelta: number,
+  anchor?: Anchor, anchorX?: number, anchorY?: number,
+} | null>(null)
 
-function appliedX(el: DraggableElement): number {
-  return drag.value?.mode === 'move' && livePatch.value?.id === el.id ? el.x + livePatch.value.dx : el.x
+function activeAnchor(el: DraggableElement): Anchor {
+  if (livePatch.value?.id === el.id && livePatch.value.anchor) return livePatch.value.anchor
+  return el.anchor
 }
-function appliedY(el: DraggableElement): number {
-  return drag.value?.mode === 'move' && livePatch.value?.id === el.id ? el.y + livePatch.value.dy : el.y
+function activeX(el: DraggableElement): number {
+  if (livePatch.value?.id === el.id) {
+    if (livePatch.value.anchorX !== undefined) return livePatch.value.anchorX
+    if (drag.value?.mode === 'move') return el.x + livePatch.value.dx
+  }
+  return el.x
 }
-function appliedWidthPct(el: DraggableElement): number {
-  const base = widthPctOf(el)
+function activeY(el: DraggableElement): number {
+  if (livePatch.value?.id === el.id) {
+    if (livePatch.value.anchorY !== undefined) return livePatch.value.anchorY
+    if (drag.value?.mode === 'move') return el.y + livePatch.value.dy
+  }
+  return el.y
+}
+function activeWidthPct(el: DraggableElement): number {
+  const base = drag.value?.mode === 'resize' && livePatch.value?.id === el.id
+    ? drag.value.origWidthPct
+    : widthPctOf(el)
   if (drag.value?.mode === 'resize' && livePatch.value?.id === el.id) {
     return clampWidth(el, base + livePatch.value.widthDelta)
   }
   return base
 }
-function appliedHeightPct(el: DraggableElement): number {
+function activeHeightPct(el: DraggableElement): number {
   if (el.type !== 'device') return heightPctOf(el)
   const fns = DEVICE_WIDTH_FNS[props.deviceFrame]
-  const w = appliedWidthPct(el)
+  const w = activeWidthPct(el)
   return (w / 100) * props.cW / fns.ratio / props.cH * 100
 }
 
 function styleFor(el: DraggableElement) {
-  const x = appliedX(el)
-  const y = appliedY(el)
+  const anchor = activeAnchor(el)
+  const x = activeX(el)
+  const y = activeY(el)
   const transform = combineTransform([
-    anchorTransform(el.anchor),
+    anchorTransform(anchor),
     el.rotate !== undefined ? `rotate(${el.rotate}deg)` : undefined,
   ])
   return {
     position: 'absolute' as const,
-    ...anchorSides(el.anchor, x, y),
-    width: `${appliedWidthPct(el)}%`,
-    height: `${appliedHeightPct(el)}%`,
+    ...anchorSides(anchor, x, y),
+    width: `${activeWidthPct(el)}%`,
+    height: `${activeHeightPct(el)}%`,
     transform,
     cursor: drag.value?.mode === 'move' && drag.value.id === el.id ? 'grabbing' : 'grab',
     zIndex: String(el.zIndex + 100),
   }
 }
 
-// Handle visual styles — small dots at corners/edges, cursor reflects the
-// resize direction the handle implies.
 const HANDLE_CURSORS: Record<HandleId, string> = {
   nw: 'nwse-resize', se: 'nwse-resize',
   ne: 'nesw-resize', sw: 'nesw-resize',
   e: 'ew-resize', w: 'ew-resize',
 }
 
-function handlePosition(handle: HandleId): { left?: string, right?: string, top?: string, bottom?: string, transform: string } {
-  // Returns absolute placement on the element. Each handle sits on the
-  // element's bounding box; translate centers the dot on the corner/edge.
+function handlePosition(handle: HandleId) {
   switch (handle) {
     case 'nw': return { left: '0', top: '0', transform: 'translate(-50%, -50%)' }
     case 'ne': return { right: '0', top: '0', transform: 'translate(50%, -50%)' }
@@ -161,20 +260,31 @@ function onMovePointerDown(e: PointerEvent, el: DraggableElement) {
 }
 
 function onResizePointerDown(e: PointerEvent, el: DraggableElement, handle: HandleId) {
+  // Re-anchor to the opposite corner so the element grows outward from the
+  // fixed side. xyForAnchor preserves the element's visual position; the
+  // resize itself just modifies width from here on.
+  const box = absoluteBox(el)
+  const newAnchor = oppositeAnchorFor(el, handle)
+  const { x: newX, y: newY } = xyForAnchor(box, newAnchor)
+
   drag.value = {
     mode: 'resize', id: el.id, handle,
     startX: e.clientX, startY: e.clientY,
     origWidthPct: widthPctOf(el),
+    migrated: { anchor: newAnchor, x: newX, y: newY },
   }
-  livePatch.value = { id: el.id, dx: 0, dy: 0, widthDelta: 0 }
+  livePatch.value = {
+    id: el.id, dx: 0, dy: 0, widthDelta: 0,
+    anchor: newAnchor, anchorX: newX, anchorY: newY,
+  }
   ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
   e.stopPropagation()
   e.preventDefault()
 }
 
-// Direction multipliers — each handle's "grow direction" in screen space.
-// Dragging a NE handle to the upper-right grows the element. The dot product
-// of (dx, dy) with this vector gives a signed grow amount.
+// Each handle's "grow direction" in screen space relative to the (now
+// re-anchored) element. Dot product of (dx, dy) with this vector gives a
+// signed grow amount. Edge handles ignore the y axis.
 const HANDLE_GROW: Record<HandleId, { sx: number, sy: number }> = {
   nw: { sx: -1, sy: -1 }, ne: { sx: 1, sy: -1 },
   se: { sx: 1, sy: 1 },   sw: { sx: -1, sy: 1 },
@@ -183,8 +293,7 @@ const HANDLE_GROW: Record<HandleId, { sx: number, sy: number }> = {
 
 function onPointerMove(e: PointerEvent) {
   if (!drag.value) return
-  const overlay = (e.currentTarget as HTMLElement)
-  const rect = overlay.getBoundingClientRect()
+  const rect = canvasRect()
   const dxScreen = e.clientX - drag.value.startX
   const dyScreen = e.clientY - drag.value.startY
 
@@ -194,24 +303,23 @@ function onPointerMove(e: PointerEvent) {
   }
   else {
     const grow = HANDLE_GROW[drag.value.handle]
-    // Project the drag onto the handle's grow axis. Corner handles take the
-    // average of x and y projections so diagonal motion reads naturally.
-    // Edge handles use a single axis directly.
+    // Project drag onto grow axis. Corners average x+y; edges take x only.
     const screenGrow = grow.sy === 0
       ? dxScreen * grow.sx
       : (dxScreen * grow.sx + dyScreen * grow.sy) / 2
-    // Convert screen-pixel grow into canvas-% width change. The 0.5
-    // multiplier slows the effect: users sense the element scale relative to
-    // the device they're staring at, not the whole canvas, so 1:1 felt
-    // jumpy. Halved gives finer control without being sluggish.
-    const widthDeltaPct = (screenGrow / rect.width) * 100 * 0.5
-    livePatch.value = { id: drag.value.id, dx: 0, dy: 0, widthDelta: widthDeltaPct }
+    // Now 1:1 against the actual canvas rect (no compensating multipliers
+    // needed) — moving the handle N screen pixels widens the element by
+    // N pixels in canvas space.
+    const widthDeltaPct = (screenGrow / rect.width) * 100
+    livePatch.value = {
+      id: drag.value.id, dx: 0, dy: 0, widthDelta: widthDeltaPct,
+      anchor: drag.value.migrated.anchor,
+      anchorX: drag.value.migrated.x,
+      anchorY: drag.value.migrated.y,
+    }
   }
 }
 
-// Position clamps. Allow slight over-edge so the variant layouts that peek
-// past the canvas (device at y: -4 etc.) still work, but stop users from
-// flinging elements completely off-screen with no way to find them.
 const POS_MIN = -30
 const POS_MAX = 130
 function clampPos(v: number): number { return Math.max(POS_MIN, Math.min(POS_MAX, v)) }
@@ -229,11 +337,22 @@ function onPointerUp(e: PointerEvent) {
         })
       }
     }
-    else if (drag.value.mode === 'resize' && live.widthDelta !== 0) {
+    else if (drag.value.mode === 'resize') {
       const el = draggableElements.value.find(x => x.id === drag.value!.id)
-      if (el) {
+      if (el && live.widthDelta !== 0) {
         const next = clampWidth(el, drag.value.origWidthPct + live.widthDelta)
-        emit('element-change', { id: drag.value.id, patch: { widthPct: next } })
+        // Commit width AND the migrated anchor in one patch. The new anchor
+        // is the source of truth from now on — subsequent renders use it as
+        // a regular preset position.
+        emit('element-change', {
+          id: drag.value.id,
+          patch: {
+            widthPct: next,
+            anchor: drag.value.migrated.anchor,
+            x: drag.value.migrated.x,
+            y: drag.value.migrated.y,
+          },
+        })
       }
     }
   }
@@ -245,14 +364,14 @@ function onPointerUp(e: PointerEvent) {
 
 function hintLabel(el: DraggableElement): string {
   if (drag.value?.id === el.id) {
-    return drag.value.mode === 'move' ? '✋ Drop to place' : `↔ ${Math.round(appliedWidthPct(el))}%`
+    return drag.value.mode === 'move' ? '✋ Drop to place' : `↔ ${Math.round(activeWidthPct(el))}%`
   }
   return '✥ Drag to move · grab a corner to resize'
 }
 </script>
 
 <template>
-  <div class="absolute inset-0 pointer-events-none">
+  <div ref="overlayEl" class="absolute inset-0 pointer-events-none">
     <div
       v-for="el in draggableElements"
       :key="el.id"
@@ -264,9 +383,6 @@ function hintLabel(el: DraggableElement): string {
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
     >
-      <!-- Resize handles — corners (devices) or edges (captions). Stop the
-           pointerdown from reaching the move surface so a corner grab starts
-           a resize, not a move. -->
       <div
         v-for="h in handlesFor(el)"
         :key="`${el.id}-${h}`"
@@ -289,8 +405,6 @@ function hintLabel(el: DraggableElement): string {
         @pointercancel.stop="onPointerUp"
       />
 
-      <!-- Hover hint sized in canvas pixels (overlay is inside the scaled
-           SlideCard wrapper, so utility classes would shrink too small). -->
       <div
         :style="{
           position: 'absolute',
