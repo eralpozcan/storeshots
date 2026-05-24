@@ -176,19 +176,6 @@ function cancelAdjust() {
         v-if="!adjustMode && !transformMode"
         type="button"
         class="absolute top-2 left-12 size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
-        title="Adjust caption position"
-        aria-label="Adjust caption position"
-        @click.stop="startAdjust"
-      >
-        <UIcon
-          name="i-lucide-move"
-          class="size-4"
-        />
-      </button>
-      <button
-        v-if="!adjustMode && !transformMode"
-        type="button"
-        class="absolute top-2 left-[5.5rem] size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
         title="Focus this slide for layout edits"
         aria-label="Focus slide"
         @click.stop="emit('focus')"

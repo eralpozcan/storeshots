@@ -55,7 +55,12 @@ export function useElementOverride(
       nextCopy[slideIdx] = rest as SlideCopy
     }
     else {
-      nextCopy[slideIdx] = { ...current, elements: next }
+      // First-time override path: drop the legacy `position` field so its
+      // translate doesn't stack on top of the caption element's own x/y.
+      // Older configs that haven't entered focused mode yet keep `position`
+      // and continue rendering via the backwards-compat captionTranslate.
+      const { position, ...rest } = current
+      nextCopy[slideIdx] = { ...rest, elements: next }
     }
     updateConfig({ copy: nextCopy })
   }

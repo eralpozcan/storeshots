@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SlideElement, DeviceElement } from '~/utils/types'
+import type { SlideElement, DeviceElement, CaptionElement } from '~/utils/types'
 import type { DeviceFrame } from '~/utils/canvas'
 import { DEVICE_WIDTH_FNS } from '~/utils/canvas'
 import { anchorSides, anchorTransform, combineTransform, dragDeltaToPatch } from '~/utils/anchor'
@@ -27,7 +27,10 @@ const emit = defineEmits<{
   'element-change': [payload: { id: string, patch: Partial<SlideElement> }]
 }>()
 
-const deviceElements = computed(() => props.elements.filter((e): e is DeviceElement => e.type === 'device'))
+// Draggable element types. Device + caption today; icon will join when the
+// trust slide gets element-level controls.
+type DraggableElement = DeviceElement | CaptionElement
+const draggableElements = computed(() => props.elements.filter((e): e is DraggableElement => e.type === 'device' || e.type === 'caption'))
 
 // Width formula resolution — same logic SlideElementRenderer uses so the
 // hit-area matches the rendered device exactly.
@@ -51,18 +54,33 @@ function deviceHeightPct(el: DeviceElement): number {
   return (widthPct / 100) * props.cW / fns.ratio / props.cH * 100
 }
 
+// Caption hit area: width from element, height auto-sized to content. Since
+// the caption HTML lives in the underlying render layer and we just want a
+// drag surface, we approximate height as a fraction of canvas. Tightening
+// this later (e.g. measuring the rendered caption) is a polish task.
+const CAPTION_HEIGHT_PCT = 14
+
+function sizeFor(el: DraggableElement): { width: string, height: string } {
+  if (el.type === 'device') {
+    return { width: `${deviceWidthPct(el)}%`, height: `${deviceHeightPct(el)}%` }
+  }
+  return {
+    width: `${el.widthPct ?? 80}%`,
+    height: `${CAPTION_HEIGHT_PCT}%`,
+  }
+}
+
 const drag = ref<{ id: string, startX: number, startY: number, origX: number, origY: number, anchor: SlideElement['anchor'] } | null>(null)
 
 // Live preview offset per element while dragging. Layered over the saved
 // position so the surface follows the cursor without yet committing the patch.
 const livePatch = ref<{ id: string, dx: number, dy: number } | null>(null)
 
-function styleFor(el: DeviceElement) {
+function styleFor(el: DraggableElement) {
   const live = livePatch.value && livePatch.value.id === el.id ? livePatch.value : null
   const x = live ? el.x + live.dx : el.x
   const y = live ? el.y + live.dy : el.y
-  const widthPct = deviceWidthPct(el)
-  const heightPct = deviceHeightPct(el)
+  const size = sizeFor(el)
   const transform = combineTransform([
     anchorTransform(el.anchor),
     el.rotate !== undefined ? `rotate(${el.rotate}deg)` : undefined,
@@ -70,15 +88,14 @@ function styleFor(el: DeviceElement) {
   return {
     position: 'absolute' as const,
     ...anchorSides(el.anchor, x, y),
-    width: `${widthPct}%`,
-    height: `${heightPct}%`,
+    ...size,
     transform,
     cursor: drag.value?.id === el.id ? 'grabbing' : 'grab',
-    zIndex: String(el.zIndex + 100), // above the rendered device
+    zIndex: String(el.zIndex + 100),
   }
 }
 
-function onPointerDown(e: PointerEvent, el: DeviceElement) {
+function onPointerDown(e: PointerEvent, el: DraggableElement) {
   drag.value = {
     id: el.id, startX: e.clientX, startY: e.clientY,
     origX: el.x, origY: el.y, anchor: el.anchor,
@@ -125,7 +142,7 @@ function onPointerUp(e: PointerEvent) {
 <template>
   <div class="absolute inset-0 pointer-events-none">
     <div
-      v-for="el in deviceElements"
+      v-for="el in draggableElements"
       :key="el.id"
       class="group/handle pointer-events-auto ring-2 ring-transparent hover:ring-blue-500/80 transition-shadow select-none relative"
       :class="drag?.id === el.id ? '!ring-blue-600 ring-4' : ''"
