@@ -114,11 +114,37 @@ function exitFocus() { focusedSlideIdx.value = null }
 
 // Read/write helper for the per-slide elements[] override. Used by the
 // transform overlay's element-change events.
-const { patchElement, resetSlide, isOverridden } = useElementOverride(config, updateConfig)
+const { patchElement, resetSlide, setVariant, isOverridden } = useElementOverride(config, updateConfig)
+
+// Each slide picks its variant from either a per-slide override
+// (SlideCopy.variant) or the positional default (slideVariants[i]). Used by
+// both the grid and focused-mode renders.
+function resolveVariant(i: number): number {
+  return config.value.copy[i]?.variant ?? slideVariants.value[i] ?? 1
+}
+
 function onElementChange(slideIdx: number, payload: { id: string, patch: Partial<SlideElement> }) {
-  const variant = slideVariants.value[slideIdx]
-  if (variant === undefined) return
+  const variant = resolveVariant(slideIdx)
   patchElement(slideIdx, variant, payload.id, payload.patch)
+}
+
+// Layout picker for the focused header — exposes all 10 variants with a
+// short description so users can swap layout without leaving the canvas.
+const VARIANT_OPTIONS: { value: number, label: string, desc: string }[] = [
+  { value: 1,  label: 'V1', desc: 'Centered device, caption top' },
+  { value: 2,  label: 'V2', desc: 'Two phones (back tilted left), caption top' },
+  { value: 3,  label: 'V3', desc: 'Device top-right, caption bottom-left' },
+  { value: 4,  label: 'V4', desc: 'Dark gradient, centered device' },
+  { value: 5,  label: 'V5', desc: 'Centered device, accent shadow' },
+  { value: 6,  label: 'V6', desc: 'Two phones (back tilted right), caption top' },
+  { value: 7,  label: 'V7', desc: 'Centered device (alt screenshot slot)' },
+  { value: 8,  label: 'V8', desc: 'Device top-right, caption bottom-left (alt)' },
+  { value: 9,  label: 'V9', desc: 'Dark gradient, centered device (alt)' },
+  { value: 10, label: 'V10', desc: 'Trust slide — app icon, no device frame' },
+]
+function pickVariant(slideIdx: number, variant: number) {
+  const positional = slideVariants.value[slideIdx] ?? 1
+  setVariant(slideIdx, variant, positional)
 }
 
 
@@ -910,7 +936,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             >
               <SlideCard
                 :index="i"
-                :variant="v"
+                :variant="resolveVariant(i)"
                 :cfg="slideConfig"
                 :c-w="canvasDims.cW"
                 :c-h="canvasDims.cH"
@@ -960,6 +986,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 </div>
               </div>
               <div class="flex items-center gap-2 shrink-0">
+                <!-- Layout variant picker — swap which of the 10 baseline
+                     layouts this slide uses. Changing variant clears any
+                     existing element overrides since they belong to the old
+                     layout's element set. -->
+                <USelect
+                  :model-value="resolveVariant(focusedSlideIdx)"
+                  :items="VARIANT_OPTIONS.map(o => ({ label: `${o.label} — ${o.desc}`, value: o.value }))"
+                  value-key="value"
+                  label-key="label"
+                  size="sm"
+                  class="min-w-[280px]"
+                  @update:model-value="(v: number) => pickVariant(focusedSlideIdx!, v)"
+                />
                 <UButton
                   size="sm"
                   :color="isOverridden(focusedSlideIdx) ? 'error' : 'neutral'"
@@ -1002,7 +1041,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               >
                 <SlideCard
                   :index="focusedSlideIdx"
-                  :variant="slideVariants[focusedSlideIdx] ?? 1"
+                  :variant="resolveVariant(focusedSlideIdx)"
                   :cfg="slideConfig"
                   :c-w="canvasDims.cW"
                   :c-h="canvasDims.cH"

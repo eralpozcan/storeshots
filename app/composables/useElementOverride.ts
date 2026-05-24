@@ -69,17 +69,36 @@ export function useElementOverride(
   function resetSlide(slideIdx: number) {
     const nextCopy = [...config.value.copy]
     const current = nextCopy[slideIdx]
-    if (!current?.elements) return
-    const { elements, ...rest } = current
+    if (!current?.elements && !current?.variant && !current?.position) return
+    const { elements, variant, position, ...rest } = current as SlideCopy
     nextCopy[slideIdx] = rest as SlideCopy
     updateConfig({ copy: nextCopy })
   }
 
-  function isOverridden(slideIdx: number): boolean {
-    return !!config.value.copy[slideIdx]?.elements
+  // Switch this slide to a different variant. Layout overrides belong to the
+  // old variant, so we drop elements + position when the variant changes.
+  function setVariant(slideIdx: number, variant: number, positionalDefault: number) {
+    const nextCopy = [...config.value.copy]
+    const current = nextCopy[slideIdx] || { label: '', headline: '' }
+    // If picking the positional default again, drop the override field so the
+    // slide goes back to inheriting from slideVariants.
+    if (variant === positionalDefault) {
+      const { variant: _v, elements, position, ...rest } = current as SlideCopy
+      nextCopy[slideIdx] = rest as SlideCopy
+    }
+    else {
+      const { elements, position, ...rest } = current as SlideCopy
+      nextCopy[slideIdx] = { ...rest, variant } as SlideCopy
+    }
+    updateConfig({ copy: nextCopy })
   }
 
-  return { resolveElements, patchElement, writeElements, resetSlide, isOverridden }
+  function isOverridden(slideIdx: number): boolean {
+    const c = config.value.copy[slideIdx]
+    return !!(c?.elements || c?.variant)
+  }
+
+  return { resolveElements, patchElement, writeElements, resetSlide, setVariant, isOverridden }
 }
 
 // Structural equality — used to drop overrides that have been edited back to

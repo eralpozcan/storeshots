@@ -3,10 +3,15 @@ export type SlideCopy = {
   headline: string // use \n for line breaks
   // Optional caption translation in canvas pixels, relative to the slide's
   // default caption position. Set via the in-card "Adjust position" mode.
+  // Deprecated — kept for backwards compat with pre-elements user configs.
   position?: { dx: number, dy: number }
   // Layout override. When present, replaces the variant's default element
   // composition. When absent, the slide falls back to VARIANT_PRESETS[variant].
   elements?: SlideElement[]
+  // Layout variant override for this slide. When absent, the slide uses the
+  // positional default from slideVariants. Switching variants drops any
+  // existing elements/position override since they belong to the old layout.
+  variant?: number
 }
 
 // Anchor on the slide canvas. First letter = vertical (t/c/b),
