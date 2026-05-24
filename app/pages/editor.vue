@@ -866,6 +866,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <!-- Slide grid -->
         <template v-else>
+          <!-- Grid mode (default) -->
+          <template v-if="focusedSlideIdx === null">
           <!-- Empty-state hint: shown until the user uploads their first screenshot. -->
           <div
             v-if="!hasAnyImages"
@@ -921,13 +923,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             </div>
           </div>
 
-          <!-- Focused canvas mode — single slide front-and-center, thumb strip
-               beneath for quick switching. Hosts the Phase 2b transform UI
-               (resize/move/rotate device frame). Layered above the grid so we
-               can dismiss without losing scroll position or grid state. -->
+          </template>
+
+          <!-- Focused canvas mode — replaces the grid entirely so it owns the
+               full canvas area. Inline (not absolute overlay) so scroll
+               position and content height don't interact. -->
           <div
-            v-if="focusedSlideIdx !== null"
-            class="absolute inset-0 z-30 bg-gray-100 flex flex-col"
+            v-else
+            class="h-full flex flex-col bg-gray-100"
           >
             <!-- Header: close + title + per-slide actions -->
             <div class="shrink-0 flex items-center justify-between gap-3 px-5 py-3 bg-white border-b border-gray-200">

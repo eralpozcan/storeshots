@@ -200,9 +200,11 @@ function onPointerMove(e: PointerEvent) {
     const screenGrow = grow.sy === 0
       ? dxScreen * grow.sx
       : (dxScreen * grow.sx + dyScreen * grow.sy) / 2
-    // Convert screen-pixel grow into canvas-% width change. 1:1 mapping so
-    // a 50px drag on a 500px-wide rendered slide changes widthPct by 10pts.
-    const widthDeltaPct = (screenGrow / rect.width) * 100
+    // Convert screen-pixel grow into canvas-% width change. The 0.5
+    // multiplier slows the effect: users sense the element scale relative to
+    // the device they're staring at, not the whole canvas, so 1:1 felt
+    // jumpy. Halved gives finer control without being sluggish.
+    const widthDeltaPct = (screenGrow / rect.width) * 100 * 0.5
     livePatch.value = { id: drag.value.id, dx: 0, dy: 0, widthDelta: widthDeltaPct }
   }
 }
