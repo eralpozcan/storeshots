@@ -34,6 +34,8 @@ export type UserConfig = {
     androidTablet10L: DeviceImages
   }
   locale: string
+  selectedLocales: string[]
+  batchLocaleGenerate: boolean
   ai: {
     provider: 'claude' | 'openrouter'
     apiKey: string

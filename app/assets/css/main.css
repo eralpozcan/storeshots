@@ -1,2 +1,3 @@
 @import "tailwindcss";
+@variant dark (&:is(.dark, .dark *));
 @import "@nuxt/ui";

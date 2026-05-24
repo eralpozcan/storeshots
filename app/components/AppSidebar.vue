@@ -1,6 +1,38 @@
 <script setup lang="ts">
+import type { ComponentPublicInstance } from 'vue'
 import type { UserConfig, SlideCopy, ImagesKey } from '~/utils/types'
 import { SLIDE_COUNT } from '~/utils/defaults'
+
+const LOCALE_OPTIONS = [
+  { label: '🇬🇧 English', value: 'en' },
+  { label: '🇩🇪 Deutsch', value: 'de' },
+  { label: '🇫🇷 Français', value: 'fr' },
+  { label: '🇪🇸 Español', value: 'es' },
+  { label: '🇧🇷 Português (Brasil)', value: 'pt' },
+  { label: '🇵🇹 Português (Portugal)', value: 'pt-PT' },
+  { label: '🇮🇹 Italiano', value: 'it' },
+  { label: '🇳🇱 Nederlands', value: 'nl' },
+  { label: '🇵🇱 Polski', value: 'pl' },
+  { label: '🇷🇺 Русский', value: 'ru' },
+  { label: '🇺🇦 Українська', value: 'uk' },
+  { label: '🇸🇪 Svenska', value: 'sv' },
+  { label: '🇩🇰 Dansk', value: 'da' },
+  { label: '🇳🇴 Norsk', value: 'no' },
+  { label: '🇫🇮 Suomi', value: 'fi' },
+  { label: '🇨🇿 Čeština', value: 'cs' },
+  { label: '🇷🇴 Română', value: 'ro' },
+  { label: '🇭🇺 Magyar', value: 'hu' },
+  { label: '🇹🇷 Türkçe', value: 'tr' },
+  { label: '🇸🇦 العربية', value: 'ar' },
+  { label: '🇮🇳 हिन्दी', value: 'hi' },
+  { label: '🇯🇵 日本語', value: 'ja' },
+  { label: '🇨🇳 中文 (简体)', value: 'zh' },
+  { label: '🇹🇼 中文 (繁體)', value: 'zh-TW' },
+  { label: '🇰🇷 한국어', value: 'ko' },
+  { label: '🇮🇩 Bahasa Indonesia', value: 'id' },
+  { label: '🇻🇳 Tiếng Việt', value: 'vi' },
+  { label: '🇹🇭 ภาษาไทย', value: 'th' },
+]
 
 const props = defineProps<{
   config: UserConfig
@@ -18,8 +50,13 @@ const emit = defineEmits<{
 const iconInputRef = ref<HTMLInputElement>()
 const ssInputRefs = ref<Record<number, HTMLInputElement>>({})
 
-function setSsRef(idx: number, el: any) {
-  if (el) ssInputRefs.value[idx] = el as HTMLInputElement
+function setSsRef(idx: number, el: Element | ComponentPublicInstance | null) {
+  if (el) ssInputRefs.value[idx] = el as unknown as HTMLInputElement
+}
+
+function onLocalesChange(locales: string[]) {
+  if (!locales.length) return // enforce at least 1 selected
+  emit('change', { selectedLocales: locales, locale: locales[0] })
 }
 
 // Wizard step. Default to step 1 if no images, otherwise jump to Headlines.
@@ -80,7 +117,7 @@ function updateAi(patch: Partial<UserConfig['ai']>) {
 
 function updateCopy(idx: number, field: keyof SlideCopy, value: string) {
   const copy = [...props.config.copy]
-  copy[idx] = { ...copy[idx], [field]: value }
+  copy[idx] = { ...copy[idx]!, [field]: value } as SlideCopy
   emit('change', { copy })
 }
 
@@ -112,8 +149,8 @@ function onSsDragEnd() {
   const to = ssDragOverIdx.value
   const images = { ...props.config.images }
   const arr = [...images[activeDevice.value]]
-  const tmp = arr[from]
-  arr[from] = arr[to]
+  const tmp = arr[from] ?? null
+  arr[from] = arr[to] ?? null
   arr[to] = tmp
   images[activeDevice.value] = arr as (string | null)[]
   emit('change', { images })
@@ -143,16 +180,16 @@ function onDragEnd() {
 
   // Swap copy
   const copy = [...props.config.copy]
-  const tmpCopy = copy[from]
-  copy[from] = copy[to]
+  const tmpCopy = copy[from]!
+  copy[from] = copy[to]!
   copy[to] = tmpCopy
 
   // Swap images for all device types
   const images = { ...props.config.images }
   for (const key of Object.keys(images) as (keyof typeof images)[]) {
     const arr = [...images[key]]
-    const tmpImg = arr[from]
-    arr[from] = arr[to]
+    const tmpImg = arr[from] ?? null
+    arr[from] = arr[to] ?? null
     arr[to] = tmpImg
     images[key] = arr
   }
@@ -200,7 +237,7 @@ async function onScreenshotSelect(idx: number, e: Event) {
   for (let i = 0; i < files.length; i++) {
     const slotIdx = idx + i
     if (slotIdx >= SLIDE_COUNT) break
-    const dataUrl = await handleFileUpload(files[i])
+    const dataUrl = await handleFileUpload(files[i]!)
     updateSlot(slotIdx, dataUrl)
   }
   // Reset input so same files can be re-selected
@@ -215,7 +252,7 @@ async function onBulkUpload(e: Event) {
   if (!files?.length) return
 
   for (let i = 0; i < Math.min(files.length, SLIDE_COUNT); i++) {
-    const dataUrl = await handleFileUpload(files[i])
+    const dataUrl = await handleFileUpload(files[i]!)
     updateSlot(i, dataUrl)
   }
   ;(e.target as HTMLInputElement).value = ''
@@ -545,7 +582,7 @@ function handleReset() {
           </div>
           <span class="text-[9px] text-gray-400">#{{ i }}</span>
           <input
-            :ref="(el) => setSsRef(i - 1, el)"
+            :ref="(el: Element | ComponentPublicInstance | null) => setSsRef(i - 1, el)"
             type="file"
             accept="image/*"
             multiple
@@ -568,35 +605,33 @@ function handleReset() {
         </p>
       </header>
 
-      <!-- Language -->
+      <!-- Languages -->
       <div>
-        <label class="block text-xs font-semibold text-gray-700 mb-1">App language</label>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Languages</label>
         <USelect
-        :model-value="config.locale"
-        :items="[
-          { label: '🇬🇧 English', value: 'en' },
-          { label: '🇹🇷 Türkçe', value: 'tr' },
-          { label: '🇩🇪 Deutsch', value: 'de' },
-          { label: '🇫🇷 Français', value: 'fr' },
-          { label: '🇪🇸 Español', value: 'es' },
-          { label: '🇵🇹 Português', value: 'pt' },
-          { label: '🇮🇹 Italiano', value: 'it' },
-          { label: '🇯🇵 日本語', value: 'ja' },
-          { label: '🇰🇷 한국어', value: 'ko' },
-          { label: '🇸🇦 العربية', value: 'ar' },
-          { label: '🇨🇳 中文', value: 'zh' },
-          { label: '🇳🇱 Nederlands', value: 'nl' },
-          { label: '🇷🇺 Русский', value: 'ru' },
-        ]"
+          :model-value="config.selectedLocales?.length ? config.selectedLocales : [config.locale]"
+          :items="LOCALE_OPTIONS"
           value-key="value"
           label-key="label"
           size="sm"
           class="w-full"
-          @update:model-value="emit('change', { locale: $event as string })"
+          multiple
+          @update:model-value="onLocalesChange($event as string[])"
         />
         <p class="mt-1 text-[10px] text-gray-400 leading-relaxed">
-          AI analyses screenshots in this language and generates headlines accordingly.
+          First language = editor preview &amp; AI generate. All selected = included in Locale bundle export.
         </p>
+        <label class="mt-2 flex items-start gap-2 cursor-pointer select-none">
+          <UCheckbox
+            :model-value="config.batchLocaleGenerate"
+            @update:model-value="emit('change', { batchLocaleGenerate: $event as boolean })"
+          />
+          <span class="text-[10px] text-gray-500 leading-relaxed">
+            <strong class="text-gray-700">Batch generate</strong> — single API call for all languages.
+            Lower rate-limit risk, but output tokens multiply by language count.
+            Only activates when 2+ languages are selected.
+          </span>
+        </label>
       </div>
 
       <!-- Generate buttons -->

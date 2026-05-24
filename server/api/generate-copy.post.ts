@@ -55,8 +55,13 @@ Respond ONLY with JSON, no markdown:
 
 const LOCALE_NAMES: Record<string, string> = {
   en: 'English', tr: 'Turkish', de: 'German', fr: 'French',
-  es: 'Spanish', pt: 'Portuguese', it: 'Italian', ja: 'Japanese',
-  ko: 'Korean', ar: 'Arabic', zh: 'Chinese', nl: 'Dutch', ru: 'Russian',
+  es: 'Spanish', pt: 'Portuguese (Brazil)', 'pt-PT': 'Portuguese (Portugal)',
+  it: 'Italian', ja: 'Japanese', ko: 'Korean', ar: 'Arabic',
+  zh: 'Chinese (Simplified)', 'zh-TW': 'Chinese (Traditional)',
+  nl: 'Dutch', ru: 'Russian', hi: 'Hindi', id: 'Indonesian',
+  pl: 'Polish', sv: 'Swedish', da: 'Danish', no: 'Norwegian',
+  fi: 'Finnish', cs: 'Czech', ro: 'Romanian', uk: 'Ukrainian',
+  vi: 'Vietnamese', th: 'Thai', hu: 'Hungarian',
 }
 
 function buildUserPrompt(appName: string, appDescription: string, features: string[], slideCount: number, locale: string, imageCount: number): string {
@@ -87,6 +92,41 @@ Narrative arc:
 - Slide 1: Hero / Main benefit (strongest selling point)
 - Slides 2-${Math.max(slideCount - 1, 2)}: One feature per slide (match to screenshots)
 - Last slide: Trust / closing message ("Made for...", "Join...", etc.)`
+}
+
+function buildMultiLocalePrompt(appName: string, appDescription: string, features: string[], slideCount: number, locales: string[], imageCount: number): string {
+  const langList = locales.map((l, i) => `${i + 1}. ${LOCALE_NAMES[l] || l} (${l})`).join('\n')
+
+  let imageNote: string
+  if (imageCount > 0) {
+    imageNote = `I have attached ${imageCount} app screenshots. Analyze them ONCE — understand the features, then translate/adapt the copy for every language.`
+  } else {
+    imageNote = 'No screenshots provided — write headlines based on the app description and features.'
+  }
+
+  return `App name: ${appName}
+Description: ${appDescription || 'A mobile app'}
+Top features (in priority order): ${features.join(', ') || 'core features'}
+Number of slides: ${slideCount}
+
+${imageNote}
+
+Generate slide copy for ALL of the following languages. Each language must have exactly ${slideCount} slides.
+Languages:
+${langList}
+
+Narrative arc (same structure for all languages):
+- Slide 1: Hero / Main benefit
+- Slides 2-${Math.max(slideCount - 1, 2)}: One feature per slide
+- Last slide: Trust / closing message
+
+Return ONLY a JSON object, no markdown:
+{
+  "locales": {
+    "<locale_code>": [{"label":"LABEL","headline":"Line one\\nLine two","imageIndex":0}, ...],
+    ...
+  }
+}`
 }
 
 function buildMessages(systemPrompt: string, userPrompt: string, images: string[], provider: string) {
@@ -165,6 +205,16 @@ export default defineEventHandler(async (event) => {
   const appDescription = ensureString(body.appDescription, 'appDescription', 4000, false)
   const locale = ensureString(body.locale ?? 'en', 'locale', 8, false)
 
+  // Multi-locale: optional array of locale codes for single-call multi-language generation
+  let multiLocales: string[] | null = null
+  if (Array.isArray(body.locales) && body.locales.length > 1) {
+    if (body.locales.length > 28) throw createError({ statusCode: 400, statusMessage: 'Too many locales (max 28)' })
+    multiLocales = body.locales.map((l: unknown, i: number) => {
+      if (typeof l !== 'string' || l.length > 8) throw createError({ statusCode: 400, statusMessage: `locales[${i}] invalid` })
+      return l
+    })
+  }
+
   // features is a list of short bullet strings collected from the editor.
   let features: string[] = []
   if (body.features != null) {
@@ -204,8 +254,8 @@ export default defineEventHandler(async (event) => {
 
   const systemPrompt = mode === 'full-design' ? DESIGN_SYSTEM_PROMPT : COPY_SYSTEM_PROMPT
 
-  async function callWithImages(imgs: string[]): Promise<string> {
-    const userPrompt = buildUserPrompt(appName, appDescription, features, slideCount, locale, imgs.length)
+  async function callWithImages(imgs: string[], overridePrompt?: string): Promise<string> {
+    const userPrompt = overridePrompt ?? buildUserPrompt(appName, appDescription, features, slideCount, locale, imgs.length)
     const msgPayload = buildMessages(systemPrompt, userPrompt, imgs, provider)
 
     if (provider === 'claude') {
@@ -218,7 +268,7 @@ export default defineEventHandler(async (event) => {
         },
         body: {
           model: claudeModel,
-          max_tokens: 2048,
+          max_tokens: multiLocales ? Math.min(multiLocales.length * 2048, 8192) : 2048,
           system: msgPayload.system,
           messages: msgPayload.messages,
         },
@@ -238,27 +288,34 @@ export default defineEventHandler(async (event) => {
       body: {
         model,
         messages: msgPayload.messages,
-        max_tokens: 2048,
+        max_tokens: multiLocales ? Math.min(multiLocales.length * 2048, 8192) : 2048,
       },
     })
     return res.choices?.[0]?.message?.content ?? ''
   }
 
-  try {
-    let responseText: string
-
-    if (images.length > 0) {
-      try {
-        // Try with images (vision)
-        responseText = await callWithImages(images)
-      } catch (visionErr: any) {
-        // Model doesn't support vision — fallback to text-only
-        console.warn('Vision not supported by model, falling back to text-only:', visionErr?.data?.error?.message || visionErr.message)
-        responseText = await callWithImages([])
-      }
-    } else {
-      responseText = await callWithImages([])
+  async function runCall(imgs: string[], prompt?: string): Promise<string> {
+    try {
+      return await callWithImages(imgs, prompt)
+    } catch (visionErr: any) {
+      if (imgs.length === 0) throw visionErr
+      console.warn('Vision failed, retrying text-only:', visionErr?.data?.error?.message || visionErr.message)
+      return callWithImages([], prompt)
     }
+  }
+
+  try {
+    // Multi-locale: single call, all languages at once
+    if (multiLocales) {
+      const prompt = buildMultiLocalePrompt(appName, appDescription, features, slideCount, multiLocales, images.length)
+      const responseText = await runCall(images, prompt)
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) throw createError({ statusCode: 502, statusMessage: 'Could not parse multi-locale AI response' })
+      const parsed = JSON.parse(jsonMatch[0])
+      return { locales: parsed.locales || {} }
+    }
+
+    const responseText = await runCall(images)
 
     if (mode === 'full-design') {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)

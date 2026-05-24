@@ -36,6 +36,8 @@ export const DEFAULT_CONFIG: UserConfig = {
     androidTablet10L: [...EMPTY_IMAGES],
   },
   locale: 'en',
+  selectedLocales: ['en'],
+  batchLocaleGenerate: false,
   ai: {
     provider: 'claude',
     apiKey: '',
@@ -66,6 +68,10 @@ export function loadConfig(): UserConfig {
       copy: parsed.copy?.length ? parsed.copy : DEFAULT_CONFIG.copy,
       features: parsed.features ?? DEFAULT_CONFIG.features,
       locale: parsed.locale ?? DEFAULT_CONFIG.locale,
+      selectedLocales: Array.isArray(parsed.selectedLocales) && parsed.selectedLocales.length
+        ? parsed.selectedLocales
+        : [parsed.locale ?? DEFAULT_CONFIG.locale],
+      batchLocaleGenerate: parsed.batchLocaleGenerate ?? DEFAULT_CONFIG.batchLocaleGenerate,
     }
   } catch {
     return DEFAULT_CONFIG

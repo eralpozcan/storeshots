@@ -72,7 +72,7 @@ export function useScreenshots() {
 
   const sizePick = computed(() => {
     const sizes = canvasDims.value.sizes
-    return sizes[Math.min(sizeIdx.value, sizes.length - 1)]
+    return sizes[Math.min(sizeIdx.value, sizes.length - 1)]!
   })
 
   // Collect uploaded images as base64 for AI vision analysis
@@ -86,7 +86,7 @@ export function useScreenshots() {
     for (let i = 0; i < slides.length && i < reordered.length; i++) {
       const idx = slides[i]?.imageIndex
       if (idx !== null && idx !== undefined && idx >= 0 && idx < originalImages.length) {
-        reordered[i] = originalImages[idx]
+        reordered[i] = originalImages[idx] ?? null
       }
     }
     return reordered
@@ -419,5 +419,6 @@ export function useScreenshots() {
     copyVariants,
     generateCopyVariants,
     applyVariant,
+    getUploadedImages,
   }
 }

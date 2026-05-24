@@ -8,6 +8,17 @@ const MAX_COUNT = 5
 
 type Slide = { label: string, headline: string }
 
+const LOCALE_NAMES: Record<string, string> = {
+  en: 'English', tr: 'Turkish', de: 'German', fr: 'French',
+  es: 'Spanish', pt: 'Portuguese (Brazil)', 'pt-PT': 'Portuguese (Portugal)',
+  it: 'Italian', ja: 'Japanese', ko: 'Korean', ar: 'Arabic',
+  zh: 'Chinese (Simplified)', 'zh-TW': 'Chinese (Traditional)',
+  nl: 'Dutch', ru: 'Russian', hi: 'Hindi', id: 'Indonesian',
+  pl: 'Polish', sv: 'Swedish', da: 'Danish', no: 'Norwegian',
+  fi: 'Finnish', cs: 'Czech', ro: 'Romanian', uk: 'Ukrainian',
+  vi: 'Vietnamese', th: 'Thai', hu: 'Hungarian',
+}
+
 const SYSTEM_PROMPT = `You are an expert App Store / Google Play copywriter producing A/B test variations.
 
 Given a base set of slides, return MULTIPLE alternative versions of the same slides — same idea per slide but different angle, tone, or rhythm. The user will pick the variant that resonates.
@@ -18,6 +29,7 @@ Rules:
 - One idea per slide. Never join two things with "and".
 - Sell feelings and outcomes, not features.
 - Labels stay 1-3 words ALL CAPS.
+- Output language MUST match the target language specified in the user prompt. ALL headlines and labels MUST be in that language.
 - Each variant should feel meaningfully different in tone:
   - variant 1: confident / direct
   - variant 2: warm / human
@@ -79,7 +91,8 @@ export default defineEventHandler(async (event) => {
   const count = Math.min(MAX_COUNT, Math.max(1, Number(body.count ?? 3)))
   if (!Number.isInteger(count)) throw createError({ statusCode: 400, statusMessage: 'count must be an integer' })
 
-  const userPrompt = `Locale: ${locale}
+  const lang = LOCALE_NAMES[locale] || 'English'
+  const userPrompt = `Target language: ${lang} (ALL output MUST be in ${lang})
 Number of variants requested: ${count}
 
 Base slides (current copy):

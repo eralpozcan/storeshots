@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ComponentPublicInstance } from 'vue'
 import { toPng, getFontEmbedCSS } from 'html-to-image'
 import JSZip from 'jszip'
 import type { Device, Orientation } from '~/utils/types'
@@ -25,6 +26,7 @@ const {
   exportProject, importProject,
   extractColorsFromScreenshots,
   copyVariants, generateCopyVariants, applyVariant,
+  getUploadedImages,
 } = useScreenshots()
 
 // Variants modal — opened from the AI step / variants button.
@@ -42,7 +44,7 @@ function chooseVariant(i: number) {
 // to a specific slide. Distinct from `exportRefs` which point at the
 // offscreen full-size capture targets.
 const previewRefs = ref<(HTMLElement | null)[]>([])
-function setPreviewRef(i: number, el: any) {
+function setPreviewRef(i: number, el: Element | ComponentPublicInstance | null) {
   previewRefs.value[i] = el as HTMLElement | null
 }
 function scrollToSlide(i: number) {
@@ -157,7 +159,7 @@ const slideVariants = computed(() => {
 const exportRefs = ref<(HTMLDivElement | null)[]>([])
 const fgRef = ref<HTMLDivElement | null>(null)
 
-function setRef(i: number, el: any) {
+function setRef(i: number, el: Element | ComponentPublicInstance | null) {
   exportRefs.value[i] = el as HTMLDivElement | null
 }
 
@@ -393,6 +395,150 @@ async function exportPreset(preset: StorePreset) {
   }
 }
 
+async function exportMultiLocale() {
+  const locales = config.value.selectedLocales
+  if (!locales?.length || !config.value.ai.apiKey) return
+
+  const zip = new JSZip()
+  const appSlug = slugLabel(config.value.appName || 'app') || 'app'
+  const origCopy = config.value.copy.map(c => ({ ...c }))
+  const s = sizePick.value
+  let totalExported = 0
+
+  // Build copy map: locale → SlideCopy[]
+  const copyMap: Record<string, { label: string; headline: string }[]> = {}
+
+  try {
+    if (locales.length > 1 && config.value.batchLocaleGenerate) {
+      // Batch mode: single API call, all locales at once (higher output tokens)
+      exporting.value = `Generating ${locales.length} languages…`
+      try {
+        const res = await $fetch('/api/generate-copy', {
+          method: 'POST',
+          body: {
+            provider: config.value.ai.provider,
+            apiKey: config.value.ai.apiKey,
+            openrouterModel: config.value.ai.openrouterModel,
+            claudeModel: config.value.ai.claudeModel,
+            appName: config.value.appName,
+            appDescription: config.value.appDescription,
+            features: config.value.features,
+            slideCount: config.value.copy.length,
+            locales,
+            mode: 'copy-only',
+            images: getUploadedImages(),
+          },
+        }) as { locales?: Record<string, any[]> }
+        for (const locale of locales) {
+          const slides = res.locales?.[locale]
+          if (slides?.length) {
+            copyMap[locale] = slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
+          }
+        }
+      }
+      catch (e: any) {
+        toast.add({
+          title: 'Batch generation failed',
+          description: e?.data?.statusMessage || e?.message || 'Unknown error',
+          color: 'error',
+          icon: 'i-lucide-triangle-alert',
+          duration: 5000,
+        })
+        return
+      }
+    }
+    else {
+      // Sequential mode: one call per locale (default)
+      for (const locale of locales) {
+        exporting.value = `Generating ${locale}…`
+        try {
+          const res = await $fetch('/api/generate-copy', {
+            method: 'POST',
+            body: {
+              provider: config.value.ai.provider,
+              apiKey: config.value.ai.apiKey,
+              openrouterModel: config.value.ai.openrouterModel,
+              claudeModel: config.value.ai.claudeModel,
+              appName: config.value.appName,
+              appDescription: config.value.appDescription,
+              features: config.value.features,
+              slideCount: config.value.copy.length,
+              locale,
+              mode: 'copy-only',
+              images: getUploadedImages(),
+            },
+          }) as { slides?: any[] }
+          if (res.slides?.length) {
+            copyMap[locale] = res.slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
+          }
+        }
+        catch (e: any) {
+          toast.add({
+            title: `Generation failed for ${locale}`,
+            description: e?.data?.statusMessage || e?.message || 'Unknown error',
+            color: 'error',
+            icon: 'i-lucide-triangle-alert',
+            duration: 5000,
+          })
+        }
+      }
+    }
+
+    // Sequential capture per locale
+    for (const locale of locales) {
+      const newCopy = copyMap[locale]
+      if (!newCopy?.length) continue
+
+      updateConfig({ copy: newCopy })
+      await nextTick()
+      await new Promise(r => setTimeout(r, 600))
+
+      const folder = zip.folder(locale)
+      const variants = slideVariants.value
+      for (let i = 0; i < variants.length; i++) {
+        const el = exportRefs.value[i]
+        if (!el || !slideHasContent(i, variants[i]!)) continue
+        exporting.value = `${locale} · ${i + 1}/${variants.length}`
+        const dataUrl = await captureElement(el, s.w, s.h)
+        const lbl = slugLabel(config.value.copy[i]?.label || '') || 'slide'
+        folder?.file(`${String(i + 1).padStart(2, '0')}-${lbl}.png`, dataUrl.split(',')[1] || '', { base64: true })
+        totalExported++
+      }
+    }
+
+    if (totalExported === 0) {
+      toast.add({
+        title: 'Nothing exported',
+        description: 'Upload screenshots first or check your API key.',
+        color: 'warning',
+        icon: 'i-lucide-image-off',
+        duration: 5000,
+      })
+      return
+    }
+
+    exporting.value = 'Zipping…'
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${appSlug}-locales.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.add({
+      title: 'Locale bundle ready',
+      description: `${locales.length} language${locales.length > 1 ? 's' : ''} · ${totalExported} slides exported`,
+      color: 'success',
+      icon: 'i-lucide-languages',
+      duration: 5000,
+    })
+  }
+  finally {
+    updateConfig({ copy: origCopy })
+    exporting.value = null
+  }
+}
+
 const projectMenuItems = computed(() => [
   {
     label: 'Save project to file',
@@ -596,6 +742,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 Bundle
               </UButton>
             </UDropdownMenu>
+            <UButton
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-languages"
+              size="sm"
+              :loading="!!exporting"
+              :disabled="!!exporting || !config.ai.apiKey || !config.selectedLocales?.length"
+              :title="!config.ai.apiKey ? 'Add an AI key to use locale export' : `Export in ${config.selectedLocales?.length ?? 1} language${(config.selectedLocales?.length ?? 1) > 1 ? 's' : ''}`"
+              @click="exportMultiLocale"
+            >
+              Locales
+            </UButton>
           </div>
         </div>
 
@@ -740,7 +898,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             <div
               v-for="(v, i) in slideVariants"
               :key="`${device}-${orientation}-${i}`"
-              :ref="(el) => setPreviewRef(i, el)"
+              :ref="(el: Element | ComponentPublicInstance | null) => setPreviewRef(i, el)"
             >
               <SlideCard
                 :index="i"
@@ -762,7 +920,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             <div
               v-for="(v, i) in slideVariants"
               :key="`exp-${device}-${orientation}-${i}`"
-              :ref="(el) => setRef(i, el)"
+              :ref="(el: Element | ComponentPublicInstance | null) => setRef(i, el)"
               :style="{ position: 'absolute', left: '-9999px', top: 0, width: `${canvasDims.cW}px`, height: `${canvasDims.cH}px` }"
             >
               <SlideTemplate
