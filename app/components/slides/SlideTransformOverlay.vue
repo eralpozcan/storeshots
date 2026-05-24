@@ -339,10 +339,28 @@ function onPointerMove(e: PointerEvent) {
   const rect = canvasRect()
 
   if (drag.value.mode === 'move') {
-    const dxScreen = e.clientX - drag.value.startX
-    const dyScreen = e.clientY - drag.value.startY
+    let dxScreen = e.clientX - drag.value.startX
+    let dyScreen = e.clientY - drag.value.startY
+    // Shift = constrain to whichever axis dominates the current drag — locks
+    // movement to the X or Y line, useful for "keep aligned, just shift".
+    if (e.shiftKey) {
+      if (Math.abs(dxScreen) > Math.abs(dyScreen)) dyScreen = 0
+      else dxScreen = 0
+    }
     const { dx, dy } = dragDeltaToPatch(drag.value.anchor, dxScreen, dyScreen, rect.width, rect.height)
-    livePatch.value = { id: drag.value.id, dx, dy, widthDelta: 0 }
+    // Snap targets in absolute canvas %: 50 (center), 0/100 (edges), and the
+    // original position so the user can "lock back" without going hunting.
+    // Alt key opts out for fine positioning.
+    const targetX = drag.value.origX + dx
+    const targetY = drag.value.origY + dy
+    const snappedX = snapTo(targetX, [50, 0, 100, drag.value.origX], SNAP_THRESHOLD_POS, e.altKey)
+    const snappedY = snapTo(targetY, [50, 0, 100, drag.value.origY], SNAP_THRESHOLD_POS, e.altKey)
+    livePatch.value = {
+      id: drag.value.id,
+      dx: snappedX - drag.value.origX,
+      dy: snappedY - drag.value.origY,
+      widthDelta: 0,
+    }
   }
   else if (drag.value.mode === 'rotate') {
     const currentAngle = angleDeg(drag.value.centerScreenX, drag.value.centerScreenY, e.clientX, e.clientY)
@@ -366,8 +384,14 @@ function onPointerMove(e: PointerEvent) {
     // needed) — moving the handle N screen pixels widens the element by
     // N pixels in canvas space.
     const widthDeltaPct = (screenGrow / rect.width) * 100
+    // Snap width to common stops (25/50/75/100% and the original) so common
+    // proportions land cleanly. Alt suppresses snap.
+    const targetWidth = drag.value.origWidthPct + widthDeltaPct
+    const snapTargets = [25, 50, 75, 100, drag.value.origWidthPct]
+    const snappedWidth = snapTo(targetWidth, snapTargets, SNAP_THRESHOLD_WIDTH, e.altKey)
     livePatch.value = {
-      id: drag.value.id, dx: 0, dy: 0, widthDelta: widthDeltaPct,
+      id: drag.value.id, dx: 0, dy: 0,
+      widthDelta: snappedWidth - drag.value.origWidthPct,
       anchor: drag.value.migrated.anchor,
       anchorX: drag.value.migrated.x,
       anchorY: drag.value.migrated.y,
@@ -378,6 +402,20 @@ function onPointerMove(e: PointerEvent) {
 const POS_MIN = -30
 const POS_MAX = 130
 function clampPos(v: number): number { return Math.max(POS_MIN, Math.min(POS_MAX, v)) }
+
+// Magnetic snap helpers. The visual feedback is implicit — the element just
+// "clicks" into place when the cursor gets within threshold of a target.
+// Holding Alt suppresses snap for fine positioning.
+const SNAP_THRESHOLD_POS = 2 // % canvas
+const SNAP_THRESHOLD_WIDTH = 3
+
+function snapTo(value: number, candidates: number[], threshold: number, alt: boolean): number {
+  if (alt) return value
+  for (const c of candidates) {
+    if (Math.abs(value - c) < threshold) return c
+  }
+  return value
+}
 
 function onPointerUp(e: PointerEvent) {
   if (!drag.value) return
@@ -432,7 +470,7 @@ function hintLabel(el: DraggableElement): string {
     if (drag.value.mode === 'rotate') return `⟳ ${Math.round(activeRotate(el) ?? 0)}°`
     return `↔ ${Math.round(activeWidthPct(el))}%`
   }
-  return '✥ Drag · ◯ corners resize · ⟳ rotate'
+  return '✥ Drag · ◯ resize · ⟳ rotate · Shift: lock axis / 15° · Alt: no snap'
 }
 </script>
 
