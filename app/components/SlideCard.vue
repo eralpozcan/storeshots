@@ -119,13 +119,13 @@ onUnmounted(() => ro?.disconnect())
       <button
         v-if="!transformMode"
         type="button"
-        class="absolute top-2 left-12 size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
-        title="Focus this slide for layout edits"
-        aria-label="Focus slide"
+        class="absolute top-2 left-12 size-8 rounded-full bg-blue-600 text-white hover:bg-blue-700 shadow-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
+        title="Edit layout — drag device frame and caption to reposition"
+        aria-label="Edit slide layout"
         @click.stop="emit('focus')"
       >
         <UIcon
-          name="i-lucide-maximize-2"
+          name="i-lucide-move"
           class="size-4"
         />
       </button>

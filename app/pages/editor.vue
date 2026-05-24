@@ -943,11 +943,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 >
                   Close
                 </UButton>
-                <div class="text-sm font-semibold text-gray-700 truncate">
-                  Slide {{ String(focusedSlideIdx + 1).padStart(2, '0') }}
-                  <span class="text-gray-400 font-normal">
-                    · {{ config.copy[focusedSlideIdx]?.label || `Slide ${focusedSlideIdx + 1}` }}
-                  </span>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-gray-700 truncate">
+                    Slide {{ String(focusedSlideIdx + 1).padStart(2, '0') }}
+                    <span class="text-gray-400 font-normal">
+                      · {{ config.copy[focusedSlideIdx]?.label || `Slide ${focusedSlideIdx + 1}` }}
+                    </span>
+                  </div>
+                  <div class="text-[11px] text-blue-600 mt-0.5 flex items-center gap-1">
+                    <UIcon name="i-lucide-move" class="size-3" />
+                    Drag the device frame or caption to reposition
+                  </div>
                 </div>
               </div>
               <div class="flex items-center gap-2 shrink-0">
