@@ -10,8 +10,8 @@ const props = defineProps<{
   cH: number
   label: string
   deviceFrame: 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad'
-  // When true, render the transform overlay (device move/resize/rotate
-  // handles) above SlideTemplate. Used by the focused canvas mode.
+  // When true, render the transform overlay (device + caption drag handles)
+  // above SlideTemplate. Used by the focused canvas mode.
   transformMode?: boolean
 }>()
 
@@ -34,9 +34,7 @@ const emit = defineEmits<{
   export: []
   edit: []
   focus: []
-  // null payload = reset to default
-  position: [value: { dx: number, dy: number } | null]
-  // Forwarded from SlideTransformOverlay when the user drags a device frame.
+  // Forwarded from SlideTransformOverlay when the user drags an element.
   'element-change': [payload: { id: string, patch: Partial<SlideElement> }]
 }>()
 
@@ -55,59 +53,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => ro?.disconnect())
-
-// Adjust-position mode — overlays a drag surface so the user can fine-tune
-// caption placement. Pointer deltas are divided by the preview scale to
-// produce canvas-pixel offsets that survive into the export.
-const adjustMode = ref(false)
-const tempPos = ref<{ dx: number, dy: number }>({ dx: 0, dy: 0 })
-const drag = { startX: 0, startY: 0, origDx: 0, origDy: 0, active: false }
-
-function startAdjust() {
-  const cur = props.cfg.copy[props.index]?.position
-  tempPos.value = { dx: cur?.dx ?? 0, dy: cur?.dy ?? 0 }
-  adjustMode.value = true
-}
-
-function onPointerDown(e: PointerEvent) {
-  drag.startX = e.clientX
-  drag.startY = e.clientY
-  drag.origDx = tempPos.value.dx
-  drag.origDy = tempPos.value.dy
-  drag.active = true
-  ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
-  e.preventDefault()
-}
-
-function onPointerMove(e: PointerEvent) {
-  if (!drag.active) return
-  const sc = scale.value || 0.15
-  tempPos.value = {
-    dx: drag.origDx + (e.clientX - drag.startX) / sc,
-    dy: drag.origDy + (e.clientY - drag.startY) / sc,
-  }
-}
-
-function onPointerUp(e: PointerEvent) {
-  drag.active = false
-  try { (e.currentTarget as Element).releasePointerCapture(e.pointerId) }
-  catch { /* noop */ }
-}
-
-function saveAdjust() {
-  emit('position', { ...tempPos.value })
-  adjustMode.value = false
-}
-
-function resetAdjust() {
-  tempPos.value = { dx: 0, dy: 0 }
-  emit('position', null)
-  adjustMode.value = false
-}
-
-function cancelAdjust() {
-  adjustMode.value = false
-}
 </script>
 
 <template>
@@ -115,7 +60,6 @@ function cancelAdjust() {
     <div
       ref="cardRef"
       class="group w-full relative overflow-hidden rounded-xl shadow-lg transition-transform duration-150 hover:shadow-2xl"
-      :class="adjustMode ? 'ring-2 ring-blue-500 ring-offset-2' : ''"
       :style="{ aspectRatio: `${cW}/${cH}` }"
     >
       <div
@@ -132,7 +76,6 @@ function cancelAdjust() {
           :c-w="cW"
           :c-h="cH"
           :device-frame="deviceFrame"
-          :position-override="adjustMode ? tempPos : null"
         />
         <SlideTransformOverlay
           v-if="transformMode"
@@ -148,7 +91,7 @@ function cancelAdjust() {
            export (Export all / preset ZIP) skips these to avoid shipping
            blank templates; users can still single-export from the card. -->
       <div
-        v-if="!hasContent && !adjustMode"
+        v-if="!hasContent"
         class="absolute bottom-2 left-2 z-10 px-2 py-1 rounded-md bg-amber-100/95 text-amber-700 text-[10px] font-semibold shadow-sm flex items-center gap-1 pointer-events-none"
       >
         <UIcon
@@ -158,9 +101,10 @@ function cancelAdjust() {
         No screenshot
       </div>
 
-      <!-- Hover overlay actions -->
+      <!-- Hover overlay actions. Hidden in transform mode — the focused
+           header is the single source of edit controls there. -->
       <button
-        v-if="!adjustMode && !transformMode"
+        v-if="!transformMode"
         type="button"
         class="absolute top-2 left-2 size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
         title="Edit copy"
@@ -173,7 +117,7 @@ function cancelAdjust() {
         />
       </button>
       <button
-        v-if="!adjustMode && !transformMode"
+        v-if="!transformMode"
         type="button"
         class="absolute top-2 left-12 size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
         title="Focus this slide for layout edits"
@@ -186,7 +130,7 @@ function cancelAdjust() {
         />
       </button>
       <button
-        v-if="!adjustMode && !transformMode"
+        v-if="!transformMode"
         type="button"
         class="absolute top-2 right-2 size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
         title="Download this slide as PNG"
@@ -198,56 +142,6 @@ function cancelAdjust() {
           class="size-4"
         />
       </button>
-
-      <!-- Adjust mode: drag surface + toolbar -->
-      <div
-        v-if="adjustMode"
-        class="absolute inset-0 cursor-move z-20 select-none"
-        @pointerdown="onPointerDown"
-        @pointermove="onPointerMove"
-        @pointerup="onPointerUp"
-        @pointercancel="onPointerUp"
-      />
-      <div
-        v-if="adjustMode"
-        class="absolute top-2 left-2 right-2 z-30 px-2.5 py-1.5 rounded-md bg-blue-600 text-white text-[11px] font-semibold shadow-md flex items-center gap-1.5 pointer-events-none"
-      >
-        <UIcon
-          name="i-lucide-move"
-          class="size-3.5"
-        />
-        Drag the slide to reposition the caption
-      </div>
-      <div
-        v-if="adjustMode"
-        class="absolute bottom-2 left-2 right-2 z-30 flex items-center justify-between gap-1"
-      >
-        <UButton
-          size="xs"
-          color="neutral"
-          variant="ghost"
-          @click.stop="cancelAdjust"
-        >
-          Cancel
-        </UButton>
-        <div class="flex gap-1">
-          <UButton
-            size="xs"
-            color="error"
-            variant="ghost"
-            title="Restore default position"
-            @click.stop="resetAdjust"
-          >
-            Reset
-          </UButton>
-          <UButton
-            size="xs"
-            @click.stop="saveAdjust"
-          >
-            Save
-          </UButton>
-        </div>
-      </div>
     </div>
     <div class="text-center text-[11px] text-gray-500">
       {{ String(index + 1).padStart(2, '0') }} · {{ label }}

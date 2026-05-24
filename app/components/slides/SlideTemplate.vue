@@ -9,8 +9,6 @@ const props = defineProps<{
   cW: number
   cH: number
   deviceFrame: DeviceFrame
-  // Live drag preview from SlideCard's adjust mode. Wins over copy.position.
-  positionOverride?: { dx: number, dy: number } | null
 }>()
 
 // Each variant maps to a slot in cfg.copy. Variants 1-9 use copy[variant-1];
@@ -41,9 +39,13 @@ const bg = computed(() => {
 const isDark = computed(() => props.variant === 4 || props.variant === 9 || props.variant === 10)
 const textColor = computed(() => isDark.value ? c.value.textLight : c.value.textDark)
 
-// User fine-tune offset applied as an extra transform on the caption element.
+// Backwards-compat translate for older configs that still carry a
+// SlideCopy.position field. New caption edits write to the caption element's
+// own x/y via useElementOverride.writeElements, which clears `position` to
+// avoid stacking. Slides that never enter focused mode keep rendering via
+// this translate until the user drags.
 const captionTranslate = computed(() => {
-  const p = props.positionOverride ?? copy.value.position ?? null
+  const p = copy.value.position ?? null
   if (!p || (p.dx === 0 && p.dy === 0)) return undefined
   return `translate(${p.dx}px, ${p.dy}px)`
 })

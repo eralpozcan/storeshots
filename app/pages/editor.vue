@@ -121,18 +121,6 @@ function onElementChange(slideIdx: number, payload: { id: string, patch: Partial
   patchElement(slideIdx, variant, payload.id, payload.patch)
 }
 
-function setSlidePosition(i: number, value: { dx: number, dy: number } | null) {
-  const next = [...config.value.copy]
-  const current = next[i] || { label: '', headline: '' }
-  if (value === null) {
-    const { position, ...rest } = current
-    next[i] = rest
-  }
-  else {
-    next[i] = { ...current, position: value }
-  }
-  updateConfig({ copy: next })
-}
 
 // Hidden file input wired to importProject
 const importInputRef = ref<HTMLInputElement | null>(null)
@@ -929,7 +917,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 @export="exportOne(i)"
                 @edit="openEdit(i)"
                 @focus="enterFocus(i)"
-                @position="(v: { dx: number, dy: number } | null) => setSlidePosition(i, v)"
               />
             </div>
           </div>
@@ -1015,7 +1002,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   :transform-mode="true"
                   @export="exportOne(focusedSlideIdx)"
                   @edit="openEdit(focusedSlideIdx)"
-                  @position="(v: { dx: number, dy: number } | null) => setSlidePosition(focusedSlideIdx!, v)"
                   @element-change="(p: { id: string, patch: Partial<SlideElement> }) => onElementChange(focusedSlideIdx!, p)"
                 />
               </div>
