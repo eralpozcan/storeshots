@@ -163,19 +163,24 @@ function xyForAnchor(box: { left: number, top: number, width: number, height: nu
 
 // Drag state — one active interaction at a time. Resize carries a snapshot
 // of the migrated anchor + x/y so onPointerMove can layer width changes on
-// top during the drag without re-emitting the anchor every move.
+// top during the drag without re-emitting the anchor every move. Rotate
+// stores the element's center (in screen px) and the starting angle so
+// motion translates directly into delta-degrees.
 type DragState =
   | { mode: 'move', id: string, startX: number, startY: number, origX: number, origY: number, anchor: Anchor }
   | { mode: 'resize', id: string, handle: HandleId, startX: number, startY: number, origWidthPct: number,
       migrated: { anchor: Anchor, x: number, y: number } }
+  | { mode: 'rotate', id: string, centerScreenX: number, centerScreenY: number,
+      origRotate: number, startAngleDeg: number }
 const drag = ref<DragState | null>(null)
 
 // Per-element live preview applied on top of saved values while a drag is
 // in flight. For resize, also tracks the migrated anchor so the rendered
-// hit area uses it.
+// hit area uses it. For rotate, tracks the active rotation in degrees.
 const livePatch = ref<{
   id: string, dx: number, dy: number, widthDelta: number,
   anchor?: Anchor, anchorX?: number, anchorY?: number,
+  rotate?: number,
 } | null>(null)
 
 function activeAnchor(el: DraggableElement): Anchor {
@@ -212,13 +217,19 @@ function activeHeightPct(el: DraggableElement): number {
   return (w / 100) * props.cW / fns.ratio / props.cH * 100
 }
 
+function activeRotate(el: DraggableElement): number | undefined {
+  if (livePatch.value?.id === el.id && livePatch.value.rotate !== undefined) return livePatch.value.rotate
+  return el.rotate
+}
+
 function styleFor(el: DraggableElement) {
   const anchor = activeAnchor(el)
   const x = activeX(el)
   const y = activeY(el)
+  const rot = activeRotate(el)
   const transform = combineTransform([
     anchorTransform(anchor),
-    el.rotate !== undefined ? `rotate(${el.rotate}deg)` : undefined,
+    rot !== undefined ? `rotate(${rot}deg)` : undefined,
   ])
   return {
     position: 'absolute' as const,
@@ -259,6 +270,38 @@ function onMovePointerDown(e: PointerEvent, el: DraggableElement) {
   e.preventDefault()
 }
 
+// Element center in screen pixels (for rotate angle math). Built from the
+// canvas rect + the element's absolute box in canvas %.
+function elementCenterScreen(el: DraggableElement): { x: number, y: number } {
+  const box = absoluteBox(el)
+  const rect = overlayEl.value?.getBoundingClientRect() ?? { left: 0, top: 0, width: props.cW, height: props.cH }
+  const cxPct = box.left + box.width / 2
+  const cyPct = box.top + box.height / 2
+  return {
+    x: rect.left + (cxPct / 100) * rect.width,
+    y: rect.top + (cyPct / 100) * rect.height,
+  }
+}
+
+function angleDeg(fromX: number, fromY: number, toX: number, toY: number): number {
+  return Math.atan2(toY - fromY, toX - fromX) * (180 / Math.PI)
+}
+
+function onRotatePointerDown(e: PointerEvent, el: DraggableElement) {
+  const center = elementCenterScreen(el)
+  const startAngle = angleDeg(center.x, center.y, e.clientX, e.clientY)
+  drag.value = {
+    mode: 'rotate', id: el.id,
+    centerScreenX: center.x, centerScreenY: center.y,
+    origRotate: el.rotate ?? 0,
+    startAngleDeg: startAngle,
+  }
+  livePatch.value = { id: el.id, dx: 0, dy: 0, widthDelta: 0, rotate: el.rotate ?? 0 }
+  ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+  e.stopPropagation()
+  e.preventDefault()
+}
+
 function onResizePointerDown(e: PointerEvent, el: DraggableElement, handle: HandleId) {
   // Re-anchor to the opposite corner so the element grows outward from the
   // fixed side. xyForAnchor preserves the element's visual position; the
@@ -294,14 +337,26 @@ const HANDLE_GROW: Record<HandleId, { sx: number, sy: number }> = {
 function onPointerMove(e: PointerEvent) {
   if (!drag.value) return
   const rect = canvasRect()
-  const dxScreen = e.clientX - drag.value.startX
-  const dyScreen = e.clientY - drag.value.startY
 
   if (drag.value.mode === 'move') {
+    const dxScreen = e.clientX - drag.value.startX
+    const dyScreen = e.clientY - drag.value.startY
     const { dx, dy } = dragDeltaToPatch(drag.value.anchor, dxScreen, dyScreen, rect.width, rect.height)
     livePatch.value = { id: drag.value.id, dx, dy, widthDelta: 0 }
   }
+  else if (drag.value.mode === 'rotate') {
+    const currentAngle = angleDeg(drag.value.centerScreenX, drag.value.centerScreenY, e.clientX, e.clientY)
+    const delta = currentAngle - drag.value.startAngleDeg
+    // Snap to 15° increments while shift is held — handy for clean angles.
+    let next = drag.value.origRotate + delta
+    if (e.shiftKey) next = Math.round(next / 15) * 15
+    // Keep rotation in the -180..180 range for readability in localStorage.
+    next = ((next + 180) % 360 + 360) % 360 - 180
+    livePatch.value = { id: drag.value.id, dx: 0, dy: 0, widthDelta: 0, rotate: next }
+  }
   else {
+    const dxScreen = e.clientX - drag.value.startX
+    const dyScreen = e.clientY - drag.value.startY
     const grow = HANDLE_GROW[drag.value.handle]
     // Project drag onto grow axis. Corners average x+y; edges take x only.
     const screenGrow = grow.sy === 0
@@ -337,6 +392,15 @@ function onPointerUp(e: PointerEvent) {
         })
       }
     }
+    else if (drag.value.mode === 'rotate' && live.rotate !== undefined && live.rotate !== drag.value.origRotate) {
+      emit('element-change', {
+        id: drag.value.id,
+        // Round to a whole degree so persisted JSON stays clean. 0 special-
+        // cases as undefined so the override-equality check in
+        // useElementOverride can drop it back to the preset.
+        patch: { rotate: Math.abs(live.rotate) < 0.5 ? undefined : Math.round(live.rotate) },
+      })
+    }
     else if (drag.value.mode === 'resize') {
       const el = draggableElements.value.find(x => x.id === drag.value!.id)
       if (el && live.widthDelta !== 0) {
@@ -364,9 +428,11 @@ function onPointerUp(e: PointerEvent) {
 
 function hintLabel(el: DraggableElement): string {
   if (drag.value?.id === el.id) {
-    return drag.value.mode === 'move' ? '✋ Drop to place' : `↔ ${Math.round(activeWidthPct(el))}%`
+    if (drag.value.mode === 'move') return '✋ Drop to place'
+    if (drag.value.mode === 'rotate') return `⟳ ${Math.round(activeRotate(el) ?? 0)}°`
+    return `↔ ${Math.round(activeWidthPct(el))}%`
   }
-  return '✥ Drag to move · grab a corner to resize'
+  return '✥ Drag · ◯ corners resize · ⟳ rotate'
 }
 </script>
 
@@ -383,6 +449,51 @@ function hintLabel(el: DraggableElement): string {
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
     >
+      <!-- Rotate handle — only on devices, offset above the top edge so it
+           doesn't crowd the corner resize handles. Hold Shift while dragging
+           to snap to 15° increments for clean angles. -->
+      <div
+        v-if="el.type === 'device'"
+        :style="{
+          position: 'absolute',
+          left: '50%', top: '0',
+          width: '64px', height: '64px',
+          transform: 'translate(-50%, -200%)',
+          background: drag?.id === el.id && drag.mode === 'rotate' ? '#1d4ed8' : '#2563eb',
+          border: '8px solid white',
+          borderRadius: '50%',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          cursor: 'grab',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'white', fontSize: '38px', fontWeight: '700',
+        }"
+        class="opacity-0 group-hover/handle:opacity-100 transition-opacity"
+        :class="drag?.id === el.id ? '!opacity-100' : ''"
+        title="Drag to rotate (hold Shift to snap to 15° steps)"
+        @pointerdown.stop="onRotatePointerDown($event, el)"
+        @pointermove.stop="onPointerMove"
+        @pointerup.stop="onPointerUp"
+        @pointercancel.stop="onPointerUp"
+      >
+        ⟳
+      </div>
+
+      <!-- Visual tether between rotate handle and element top, so the
+           interaction is legible from a glance. -->
+      <div
+        v-if="el.type === 'device'"
+        :style="{
+          position: 'absolute',
+          left: '50%', top: '0',
+          width: '4px', height: '128px',
+          transform: 'translate(-50%, -100%)',
+          background: '#2563eb',
+          opacity: '0.4',
+          pointerEvents: 'none',
+        }"
+        class="opacity-0 group-hover/handle:!opacity-40 transition-opacity"
+      />
+
       <div
         v-for="h in handlesFor(el)"
         :key="`${el.id}-${h}`"
