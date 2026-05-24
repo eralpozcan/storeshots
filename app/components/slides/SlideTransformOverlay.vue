@@ -127,13 +127,40 @@ function onPointerUp(e: PointerEvent) {
     <div
       v-for="el in deviceElements"
       :key="el.id"
-      class="pointer-events-auto ring-2 ring-blue-400/60 hover:ring-blue-500 ring-offset-0 select-none"
-      :class="drag?.id === el.id ? 'ring-blue-600 ring-4' : ''"
+      class="group/handle pointer-events-auto ring-2 ring-transparent hover:ring-blue-500/80 transition-shadow select-none relative"
+      :class="drag?.id === el.id ? '!ring-blue-600 ring-4' : ''"
       :style="styleFor(el)"
       @pointerdown="onPointerDown($event, el)"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
-    />
+    >
+      <!-- Hover hint — appears only when this device frame is hovered or
+           being dragged. Anchored to the top of the device so it stays in
+           view even when the device peeks out of the canvas bottom. -->
+      <!-- Hint sized in canvas pixels — SlideCard scales the whole overlay
+           down for display, so we need oversized values to read cleanly at
+           typical focused-mode scales (~0.3). -->
+      <div
+        :style="{
+          position: 'absolute',
+          left: '50%', top: '8px',
+          transform: 'translateX(-50%)',
+          padding: '20px 40px',
+          borderRadius: '24px',
+          background: '#2563eb',
+          color: 'white',
+          fontSize: '64px',
+          fontWeight: '700',
+          lineHeight: '1',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+          whiteSpace: 'nowrap',
+        }"
+        class="pointer-events-none opacity-0 group-hover/handle:opacity-100 transition-opacity"
+        :class="drag?.id === el.id ? '!opacity-100' : ''"
+      >
+        {{ drag?.id === el.id ? '✋ Drop to place' : '✥ Drag to move' }}
+      </div>
+    </div>
   </div>
 </template>
