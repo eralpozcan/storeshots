@@ -4,6 +4,50 @@ All notable changes to Storeshots are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project loosely
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.7.0] — 2026-05-24
+
+### Added
+- **Locale matrix — multi-language export** — new "Locales" button in the
+  toolbar generates AI copy in every selected language and exports each as
+  a separate folder inside a single ZIP (`/en/`, `/tr/`, `/ja/`, …).
+  No extra server work needed: the existing `/api/generate-copy` locale
+  param is called once per language in sequence.
+- **28-language support** — expanded from 13 to 28 languages across AI
+  copy generation, variant generation, and the sidebar language picker.
+  New additions: Hindi, Indonesian, Polish, Swedish, Danish, Norwegian,
+  Finnish, Czech, Romanian, Ukrainian, Vietnamese, Thai, Hungarian,
+  Brazilian Portuguese (`pt`) / European Portuguese (`pt-PT`),
+  Traditional Chinese (`zh-TW`).
+- **Unified "Languages" selector** — replaced the separate "App language"
+  (single-select) and "Export languages" (multi-select) fields with a
+  single multi-select. First selected language drives the editor preview
+  and AI generate; all selected languages are included in the Locale
+  bundle export.
+
+### Fixed
+- **Dark mode bleed on light-forced sites** — inputs and textareas were
+  rendered with dark backgrounds for OS-dark-mode users even though
+  `colorMode.preference: 'light'` was set. Root cause: Tailwind v4 defaults
+  dark variant to `@media (prefers-color-scheme: dark)` regardless of the
+  `@nuxtjs/color-mode` class strategy. Fixed by adding
+  `@variant dark (&:is(.dark, .dark *))` in `main.css` so dark utilities
+  only activate when the `.dark` class is explicitly present.
+
+### Improved
+- **`copy-variants` locale handling** — variant endpoint now maps locale
+  codes to full language names (same `LOCALE_NAMES` table as
+  `generate-copy`) and injects an explicit "ALL output MUST be in
+  [language]" constraint into both system and user prompts, preventing
+  mixed-language output on non-Latin locales.
+
+### Internal
+- TypeScript strictness fixes in `AppSidebar.vue`: array index accesses
+  guarded with `!` / `?? null`, `FileList` index assertions, and
+  `setSsRef` parameter typed as `Element | ComponentPublicInstance | null`
+  instead of implicit `any`.
+
 ## [0.6.3] — 2026-05-07
 
 ### Added
@@ -239,6 +283,7 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
+[0.7.0]: https://github.com/eralpozcan/storeshots/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/eralpozcan/storeshots/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/eralpozcan/storeshots/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/eralpozcan/storeshots/compare/v0.6.0...v0.6.1
