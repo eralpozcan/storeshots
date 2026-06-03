@@ -63,12 +63,20 @@ function parseSlides(value: unknown): Slide[] {
   })
 }
 
+// Repair the invalid escapes / raw control chars models sometimes emit, which
+// otherwise make JSON.parse throw "Bad escaped character in JSON".
+function repairJson(raw: string): string {
+  return raw
+    .replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
+    .replace(/[\x00-\x1F]+/g, ' ')
+}
+
 function tryParseJson(text: string): any {
-  try { return JSON.parse(text) }
+  const candidate = text.match(/\{[\s\S]*\}/)?.[0] ?? text
+  try { return JSON.parse(candidate) }
   catch {
-    const match = text.match(/\{[\s\S]*\}/)
-    if (match) return JSON.parse(match[0])
-    throw new Error('Provider returned non-JSON content')
+    try { return JSON.parse(repairJson(candidate)) }
+    catch { throw new Error('Provider returned non-JSON content') }
   }
 }
 

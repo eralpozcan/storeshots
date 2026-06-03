@@ -6,6 +6,53 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-06-04
+
+### Added
+- **Per-language editing in the editor**. Generated languages are now kept in
+  state (`copyByLocale`) instead of being produced and discarded at export
+  time. A language tab bar above the canvas (shown when 2+ languages are
+  selected) lets you switch between languages, see how each one reads, and
+  edit copy inline — every edit is saved per language. A green dot marks
+  languages that already have copy.
+- **Configurable export dialog**. A single **Export** button opens a panel to
+  pick any combination of languages × devices × sizes and download them as one
+  ZIP, nested as `<language>/<device>/<size>/NN-label.png` (the language folder
+  is omitted when only one language is selected). Store presets (App Store,
+  Play Store, Everything) act as one-click quick-fills for the device/size
+  checkboxes.
+- **Parallel slide capture**. Slides within a single device/size frame are now
+  captured concurrently (capped at 3) to speed up large multi-target exports.
+
+### Changed
+- **Language generation is centralized in the sidebar**. The sidebar's
+  ✦ Headlines / ✦ Full design buttons now generate copy for *every* selected
+  language at once (previously only the active one), filling the editor's
+  language tabs. This removes the earlier duplicate "Translate all" trigger and
+  unifies generation under one mental model.
+- **Export is unified**. The separate "Export All", "Bundle", and "Locales"
+  buttons are replaced by the single language-aware Export dialog above.
+
+### Fixed
+- **AI generation no longer fails with `Bad escaped character in JSON`**.
+  Model responses that contain invalid backslash escapes or raw control
+  characters are now repaired before parsing, across `/api/generate-copy` and
+  `/api/copy-variants`. Valid `\n` line breaks are preserved.
+- **iPhone 6.1″ export size corrected** from the retired `1125×2436` to
+  `1179×2556`, which App Store Connect accepts. All four iPhone sizes now match
+  the store's accepted dimensions.
+- **Exports are now the exact selected pixel size**. Capture used a 2× pixel
+  ratio, producing double-sized images (e.g. `1320×2868` → `2640×5736`) that
+  the store rejected; it now renders at 1×.
+- **Uploaded screenshots are no longer dropped on AI generate**. When the AI
+  returned a partial, duplicate, or out-of-range `imageIndex` set, some
+  screenshots were reordered to `null`. Reordering is now lossless — any
+  uploaded image the AI didn't place is re-homed into a free slot.
+- **Editor no longer crashes after layout/variant edits across languages**.
+  Editing a slide beyond a shorter language's copy length left a sparse array
+  with `undefined` entries (`Cannot read properties of undefined (reading
+  'label')`); copy is now densified on every write.
+
 ## [0.8.1] — 2026-06-03
 
 ### Fixed
@@ -362,6 +409,7 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
+[0.9.0]: https://github.com/eralpozcan/storeshots/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/eralpozcan/storeshots/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/eralpozcan/storeshots/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/eralpozcan/storeshots/compare/v0.6.3...v0.7.0

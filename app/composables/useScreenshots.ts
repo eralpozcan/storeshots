@@ -49,16 +49,44 @@ export function useScreenshots() {
 
   function updateConfig(patch: Partial<UserConfig>) {
     const prev = config.value
-    config.value = {
+    // Densify any incoming copy: layout/variant edits can index past the
+    // current array length (e.g. after switching to a shorter-locale copy),
+    // which leaves sparse holes. Array.from walks holes as undefined → blank
+    // slide, guaranteeing config.copy never contains an undefined entry that
+    // would crash the copy-list render.
+    const denseCopy = patch.copy
+      ? Array.from(patch.copy as any[], (c: any) => c ?? { label: '', headline: '' })
+      : undefined
+    const next: UserConfig = {
       ...prev,
       ...patch,
       colors: patch.colors ? { ...prev.colors, ...patch.colors } : prev.colors,
       images: patch.images ? { ...prev.images, ...patch.images } : prev.images,
       ai: patch.ai ? { ...prev.ai, ...patch.ai } : prev.ai,
-      copy: patch.copy ?? prev.copy,
+      copy: denseCopy ?? prev.copy,
+      copyByLocale: patch.copyByLocale ?? prev.copyByLocale,
       features: patch.features ?? prev.features,
     }
+    // Write-through: any edit to the live `copy` mirrors into the active
+    // locale's slot so switching languages never loses unsaved edits. Skip when
+    // the caller already manages copyByLocale (e.g. switchLocale, generateLocales).
+    if (denseCopy && !patch.copyByLocale) {
+      next.copyByLocale = { ...next.copyByLocale, [next.locale]: denseCopy }
+    }
+    config.value = next
     saveConfig(config.value)
+  }
+
+  // Switch the editor to a different language. Persists the current live copy
+  // into the active locale's slot, then loads the target locale's stored copy
+  // (or seeds it from the current copy if that language hasn't been generated
+  // yet, so the user can translate manually).
+  function switchLocale(locale: string) {
+    if (locale === config.value.locale) return
+    const map = { ...config.value.copyByLocale, [config.value.locale]: config.value.copy }
+    const target = map[locale]
+    const nextCopy = target?.length ? target : config.value.copy.map(c => ({ ...c }))
+    updateConfig({ locale, copy: nextCopy, copyByLocale: { ...map, [locale]: nextCopy } })
   }
 
   const canvasDims = computed(() => {
@@ -110,15 +138,36 @@ export function useScreenshots() {
     return Promise.all(full.map(img => downscaleDataUrl(img)))
   }
 
-  // Reorder images based on AI's imageIndex suggestions
+  // Reorder images to match the AI's suggested slide order via imageIndex.
+  // LOSSLESS: an uploaded screenshot must never be dropped just because the AI
+  // returned a partial, duplicate, or out-of-range imageIndex set. After
+  // placing images by imageIndex, any uploaded image that wasn't placed is
+  // appended into the remaining empty slots in original order.
   function reorderImages(slides: any[], originalImages: (string | null)[]): (string | null)[] {
-    const reordered: (string | null)[] = Array(originalImages.length).fill(null)
-    for (let i = 0; i < slides.length && i < reordered.length; i++) {
+    const n = originalImages.length
+    const reordered: (string | null)[] = Array(n).fill(null)
+    const used = new Set<number>()
+
+    for (let i = 0; i < slides.length && i < n; i++) {
       const idx = slides[i]?.imageIndex
-      if (idx !== null && idx !== undefined && idx >= 0 && idx < originalImages.length) {
-        reordered[i] = originalImages[idx] ?? null
+      if (idx !== null && idx !== undefined && idx >= 0 && idx < n
+        && originalImages[idx] != null && !used.has(idx)) {
+        reordered[i] = originalImages[idx]
+        used.add(idx)
       }
     }
+
+    // Safety net: re-home any uploaded image the AI's imageIndex didn't place,
+    // so a bad/incomplete suggestion can never delete a screenshot.
+    let cursor = 0
+    for (let idx = 0; idx < n; idx++) {
+      if (originalImages[idx] == null || used.has(idx)) continue
+      while (cursor < n && reordered[cursor] != null) cursor++
+      if (cursor >= n) break
+      reordered[cursor] = originalImages[idx]
+      used.add(idx)
+    }
+
     return reordered
   }
 
@@ -175,6 +224,13 @@ export function useScreenshots() {
         color: 'warning',
         icon: 'i-lucide-key',
       })
+      return
+    }
+    // Multi-language: generate copy for every selected language at once so each
+    // one is editable via the editor's language tabs. Single language falls
+    // through to the regular active-locale generation below.
+    if ((config.value.selectedLocales?.length ?? 1) > 1) {
+      await generateLocales()
       return
     }
     generating.value = true
@@ -237,6 +293,88 @@ export function useScreenshots() {
     } catch (e: any) {
       showAIError('AI design generation failed', e)
     } finally {
+      generating.value = false
+    }
+    // Full design derives colors + active-language copy from the screenshots.
+    // When multiple languages are selected, translate the remaining ones too
+    // (copy only — colors are language-independent), filling the editor tabs.
+    if ((config.value.selectedLocales?.length ?? 1) > 1) {
+      await generateLocales({ onlyMissing: true })
+    }
+  }
+
+  // Generate copy for every selected language and persist each into
+  // copyByLocale so the editor language tabs can review/edit them. Unlike the
+  // export-time generation, this keeps the results in state rather than
+  // discarding them after a one-shot ZIP.
+  async function generateLocales(opts?: { onlyMissing?: boolean }) {
+    if (!config.value.ai.apiKey) {
+      toast.add({
+        title: 'API key missing',
+        description: 'Add an OpenRouter or Anthropic API key before generating languages.',
+        color: 'warning',
+        icon: 'i-lucide-key',
+      })
+      return
+    }
+    const selected = config.value.selectedLocales?.length
+      ? config.value.selectedLocales
+      : [config.value.locale]
+    const map: Record<string, SlideCopy[]> = { ...config.value.copyByLocale }
+    // onlyMissing keeps languages already generated/edited (e.g. the active one
+    // a full-design pass just produced); otherwise regenerate every selection.
+    const locales = opts?.onlyMissing ? selected.filter(l => !map[l]?.length) : selected
+    if (!locales.length) return
+    generating.value = true
+    try {
+      const images = await getUploadedImages()
+      const baseBody = {
+        provider: config.value.ai.provider,
+        apiKey: config.value.ai.apiKey,
+        openrouterModel: config.value.ai.openrouterModel,
+        claudeModel: config.value.ai.claudeModel,
+        appName: config.value.appName,
+        appDescription: config.value.appDescription,
+        features: config.value.features,
+        slideCount: config.value.copy.length,
+        mode: 'copy-only' as const,
+        images,
+      }
+      if (locales.length > 1 && config.value.batchLocaleGenerate) {
+        const res = await $fetch('/api/generate-copy', {
+          method: 'POST',
+          body: { ...baseBody, locales },
+        }) as { locales?: Record<string, any[]> }
+        for (const loc of locales) {
+          const slides = res.locales?.[loc]
+          if (slides?.length) map[loc] = slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
+        }
+      }
+      else {
+        for (const loc of locales) {
+          const res = await $fetch('/api/generate-copy', {
+            method: 'POST',
+            body: { ...baseBody, locale: loc },
+          }) as { slides?: any[] }
+          if (res.slides?.length) map[loc] = res.slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
+        }
+      }
+      const active = config.value.locale
+      updateConfig({
+        copyByLocale: map,
+        copy: map[active]?.length ? map[active]! : config.value.copy,
+      })
+      toast.add({
+        title: 'Languages generated',
+        description: `${Object.keys(map).length} language${Object.keys(map).length > 1 ? 's' : ''} ready — use the language tabs to review and edit.`,
+        color: 'success',
+        icon: 'i-lucide-languages',
+      })
+    }
+    catch (e: any) {
+      showAIError('Language generation failed', e)
+    }
+    finally {
       generating.value = false
     }
   }
@@ -406,6 +544,7 @@ export function useScreenshots() {
         images: { ...DEFAULT_CONFIG.images, ...(incoming.images || {}) },
         ai: { ...DEFAULT_CONFIG.ai, ...(incoming.ai || {}), apiKey: currentKey },
         copy: Array.isArray(incoming.copy) && incoming.copy.length ? incoming.copy : DEFAULT_CONFIG.copy,
+        copyByLocale: (incoming.copyByLocale && typeof incoming.copyByLocale === 'object') ? incoming.copyByLocale : {},
         features: Array.isArray(incoming.features) ? incoming.features : DEFAULT_CONFIG.features,
         locale: typeof incoming.locale === 'string' ? incoming.locale : DEFAULT_CONFIG.locale,
       }
@@ -441,6 +580,8 @@ export function useScreenshots() {
     slideConfig,
     sizePick,
     updateConfig,
+    switchLocale,
+    generateLocales,
     generateCopy,
     generateFullDesign,
     exportProject,
