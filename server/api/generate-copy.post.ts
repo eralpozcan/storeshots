@@ -276,7 +276,7 @@ export default defineEventHandler(async (event) => {
       return res.content?.[0]?.text ?? ''
     }
 
-    const model = openrouterModel || 'anthropic/claude-3-5-sonnet'
+    const model = openrouterModel || 'anthropic/claude-sonnet-4.6'
     const res = await $fetch<any>('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {

@@ -484,6 +484,7 @@ async function exportMultiLocale() {
       // Batch mode: single API call, all locales at once (higher output tokens)
       exporting.value = `Generating ${locales.length} languages…`
       try {
+        const images = await getUploadedImages()
         const res = await $fetch('/api/generate-copy', {
           method: 'POST',
           body: {
@@ -497,7 +498,7 @@ async function exportMultiLocale() {
             slideCount: config.value.copy.length,
             locales,
             mode: 'copy-only',
-            images: getUploadedImages(),
+            images,
           },
         }) as { locales?: Record<string, any[]> }
         for (const locale of locales) {
@@ -520,6 +521,7 @@ async function exportMultiLocale() {
     }
     else {
       // Sequential mode: one call per locale (default)
+      const images = await getUploadedImages()
       for (const locale of locales) {
         exporting.value = `Generating ${locale}…`
         try {
@@ -536,7 +538,7 @@ async function exportMultiLocale() {
               slideCount: config.value.copy.length,
               locale,
               mode: 'copy-only',
-              images: getUploadedImages(),
+              images,
             },
           }) as { slides?: any[] }
           if (res.slides?.length) {

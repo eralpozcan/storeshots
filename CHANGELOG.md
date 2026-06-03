@@ -6,6 +6,36 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-06-03
+
+### Fixed
+- **AI generation no longer fails with `413 Payload Too Large`**. Uploaded
+  screenshots are now downscaled client-side to a ~1024px JPEG before being
+  sent to `/api/generate-copy`, cutting the request body ~10–20×. Full-res
+  base64 images previously exceeded the hosting proxy's body limit, so the
+  request was rejected before reaching the handler. Falls back to the
+  original data URL if a canvas resize fails.
+- **AI generation no longer fails with `404 "No endpoints found"`**. The
+  OpenRouter model slugs `anthropic/claude-3-5-sonnet` and
+  `google/gemini-2.0-flash-001`, plus the free quick-pick chips
+  (`gemini-2.0-flash-exp:free`, `llama-4-maverick:free`,
+  `deepseek-chat-v3-0324:free`), had been retired by OpenRouter. Replaced
+  the default model, server fallbacks, and sidebar quick-picks with current
+  slugs (`anthropic/claude-sonnet-4.6`, `google/gemini-2.5-flash`, and live
+  free vision models `gemma-4:free`, `nemotron-vl:free`, `kimi-k2:free`).
+  Removed the retired Claude 3.5 entries from the Claude model picker.
+
+### Added
+- **Comma-separated feature input** — the sidebar feature field now accepts
+  several comma-separated features at once, de-duplicating against existing
+  ones, instead of one entry per submit.
+
+### Changed
+- pnpm build-script allowlist moved from `package.json`'s `pnpm` field to
+  `pnpm-workspace.yaml` (`onlyBuiltDependencies`), the canonical location for
+  pnpm 11. Fixes `ERR_PNPM_IGNORED_BUILDS` aborting `nuxt dev`'s pre-dev
+  install check.
+
 ## [0.8.0] — 2026-05-24
 
 ### Added
@@ -332,6 +362,7 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
+[0.8.1]: https://github.com/eralpozcan/storeshots/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/eralpozcan/storeshots/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/eralpozcan/storeshots/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/eralpozcan/storeshots/compare/v0.6.2...v0.6.3

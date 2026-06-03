@@ -8,6 +8,34 @@ import {
   ANDROID_10P_SIZES, ANDROID_10L_SIZES, IPAD_SIZES, FG_SIZES,
 } from '~/utils/canvas'
 
+// Downscale a base64 data URL to a small JPEG for AI vision analysis.
+// Full-res screenshots (up to ~1.5MB each) blow past the hosting proxy's body
+// size limit and trigger a 413 before the request reaches our handler. The
+// vision model only needs ~1024px to read a screenshot, so shrink + re-encode
+// as JPEG to cut the payload ~10-20x. Falls back to the original on any failure.
+async function downscaleDataUrl(dataUrl: string, maxDim = 1024, quality = 0.72): Promise<string> {
+  try {
+    const img = new Image()
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('image decode failed'))
+      img.src = dataUrl
+    })
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+    const w = Math.round(img.width * scale)
+    const h = Math.round(img.height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return dataUrl
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas.toDataURL('image/jpeg', quality)
+  } catch {
+    return dataUrl
+  }
+}
+
 export function useScreenshots() {
   const config = ref<UserConfig>(loadConfig())
   const device = ref<Device>('iphone')
@@ -75,9 +103,11 @@ export function useScreenshots() {
     return sizes[Math.min(sizeIdx.value, sizes.length - 1)]!
   })
 
-  // Collect uploaded images as base64 for AI vision analysis
-  function getUploadedImages(): string[] {
-    return config.value.images.iphone.filter((img): img is string => !!img)
+  // Collect uploaded images as base64 for AI vision analysis, downscaled to
+  // keep the request body under the hosting proxy's size limit (avoids 413).
+  async function getUploadedImages(): Promise<string[]> {
+    const full = config.value.images.iphone.filter((img): img is string => !!img)
+    return Promise.all(full.map(img => downscaleDataUrl(img)))
   }
 
   // Reorder images based on AI's imageIndex suggestions
@@ -149,7 +179,7 @@ export function useScreenshots() {
     }
     generating.value = true
     try {
-      const images = getUploadedImages()
+      const images = await getUploadedImages()
       const res = await $fetch('/api/generate-copy', {
         method: 'POST',
         body: {
@@ -186,7 +216,7 @@ export function useScreenshots() {
     }
     generating.value = true
     try {
-      const images = getUploadedImages()
+      const images = await getUploadedImages()
       const res = await $fetch('/api/generate-copy', {
         method: 'POST',
         body: {
