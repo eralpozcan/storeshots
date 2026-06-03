@@ -75,13 +75,18 @@ const activeDevice = ref<ImagesKey>('iphone')
 // Features chip-input draft. Press Enter to commit a chip, click ✕ to remove.
 const featureDraft = ref('')
 function addFeature() {
-  const v = featureDraft.value.trim()
-  if (!v) return
-  if (props.config.features.includes(v)) {
-    featureDraft.value = ''
-    return
+  const parts = featureDraft.value
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
+  if (!parts.length) return
+  const next = [...props.config.features]
+  for (const p of parts) {
+    if (!next.includes(p)) next.push(p)
   }
-  emit('change', { features: [...props.config.features, v] })
+  if (next.length !== props.config.features.length) {
+    emit('change', { features: next })
+  }
   featureDraft.value = ''
 }
 function removeFeature(idx: number) {
@@ -773,7 +778,7 @@ function handleReset() {
           <UInput
             :model-value="config.ai.openrouterModel"
             size="sm"
-            placeholder="anthropic/claude-3-5-sonnet"
+            placeholder="anthropic/claude-sonnet-4.6"
             class="w-full"
             @update:model-value="updateAi({ openrouterModel: $event as string })"
           />
@@ -787,24 +792,24 @@ function handleReset() {
           <div class="flex flex-wrap gap-1">
             <span
               class="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded cursor-pointer hover:bg-amber-200 transition-colors"
-              @click="updateAi({ openrouterModel: 'google/gemini-2.0-flash-001' })"
-            >gemini-2.0-flash</span>
+              @click="updateAi({ openrouterModel: 'google/gemini-2.5-flash' })"
+            >gemini-2.5-flash</span>
             <span
               class="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded cursor-pointer hover:bg-amber-200 transition-colors"
-              @click="updateAi({ openrouterModel: 'anthropic/claude-3-5-sonnet' })"
-            >claude-3.5-sonnet</span>
+              @click="updateAi({ openrouterModel: 'anthropic/claude-sonnet-4.6' })"
+            >claude-sonnet-4.6</span>
             <span
               class="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded cursor-pointer hover:bg-amber-200 transition-colors"
               @click="updateAi({ openrouterModel: 'openai/gpt-4o-mini' })"
             >gpt-4o-mini</span>
           </div>
         </div>
-        <!-- Free text-only models -->
+        <!-- Free vision-capable models -->
         <p class="text-[10px] text-gray-400 leading-relaxed">
-          Free (text-only):
-          <span class="text-gray-500 cursor-pointer hover:text-blue-500" @click="updateAi({ openrouterModel: 'google/gemini-2.0-flash-exp:free' })">gemini-2.0-flash:free</span>,
-          <span class="text-gray-500 cursor-pointer hover:text-blue-500" @click="updateAi({ openrouterModel: 'meta-llama/llama-4-maverick:free' })">llama-4-maverick:free</span>,
-          <span class="text-gray-500 cursor-pointer hover:text-blue-500" @click="updateAi({ openrouterModel: 'deepseek/deepseek-chat-v3-0324:free' })">deepseek-chat:free</span>
+          Free (vision):
+          <span class="text-gray-500 cursor-pointer hover:text-blue-500" @click="updateAi({ openrouterModel: 'google/gemma-4-31b-it:free' })">gemma-4:free</span>,
+          <span class="text-gray-500 cursor-pointer hover:text-blue-500" @click="updateAi({ openrouterModel: 'nvidia/nemotron-nano-12b-v2-vl:free' })">nemotron-vl:free</span>,
+          <span class="text-gray-500 cursor-pointer hover:text-blue-500" @click="updateAi({ openrouterModel: 'moonshotai/kimi-k2.6:free' })">kimi-k2:free</span>
         </p>
       </template>
       <!-- Claude model picker + info -->
@@ -817,8 +822,6 @@ function handleReset() {
               { label: 'Claude Opus 4.7 — most capable', value: 'claude-opus-4-7' },
               { label: 'Claude Sonnet 4.6 — balanced (default)', value: 'claude-sonnet-4-6' },
               { label: 'Claude Haiku 4.5 — fast & cheap', value: 'claude-haiku-4-5-20251001' },
-              { label: 'Claude 3.5 Sonnet — older, vision', value: 'claude-3-5-sonnet-20241022' },
-              { label: 'Claude 3.5 Haiku — older, cheap', value: 'claude-3-5-haiku-20241022' },
             ]"
             value-key="value"
             label-key="label"
