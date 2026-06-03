@@ -168,6 +168,21 @@ function buildMessages(systemPrompt: string, userPrompt: string, images: string[
 // Anything larger is almost certainly abuse.
 const MAX_BODY_BYTES = 8 * 1024 * 1024
 
+// Models occasionally emit JSON with invalid backslash escapes (e.g. a stray
+// "\" in a headline, or "\x"/"\ " sequences) which makes JSON.parse throw
+// "Bad escaped character in JSON". Retry once after escaping any backslash that
+// isn't a valid JSON escape, and stripping raw control characters inside strings.
+function parseLooseJson(raw: string): any {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    const repaired = raw
+      .replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
+      .replace(/[\x00-\x1F]+/g, " ")
+    return JSON.parse(repaired)
+  }
+}
+
 function ensureString(v: unknown, field: string, max: number, required = true): string {
   if (v == null || v === '') {
     if (required) throw createError({ statusCode: 400, statusMessage: `Missing field: ${field}` })
@@ -311,7 +326,7 @@ export default defineEventHandler(async (event) => {
       const responseText = await runCall(images, prompt)
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw createError({ statusCode: 502, statusMessage: 'Could not parse multi-locale AI response' })
-      const parsed = JSON.parse(jsonMatch[0])
+      const parsed = parseLooseJson(jsonMatch[0])
       return { locales: parsed.locales || {} }
     }
 
@@ -320,13 +335,13 @@ export default defineEventHandler(async (event) => {
     if (mode === 'full-design') {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw createError({ statusCode: 502, statusMessage: 'Could not parse AI response' })
-      const parsed = JSON.parse(jsonMatch[0])
+      const parsed = parseLooseJson(jsonMatch[0])
       return { slides: parsed.slides || [], colors: parsed.colors || null }
     }
 
     const jsonMatch = responseText.match(/\[[\s\S]*\]/)
     if (!jsonMatch) throw createError({ statusCode: 502, statusMessage: 'Could not parse AI response' })
-    return { slides: JSON.parse(jsonMatch[0]) }
+    return { slides: parseLooseJson(jsonMatch[0]) }
   } catch (err: any) {
     if (err.statusCode) throw err
     throw createError({ statusCode: 500, statusMessage: String(err) })

@@ -624,7 +624,8 @@ function handleReset() {
           @update:model-value="onLocalesChange($event as string[])"
         />
         <p class="mt-1 text-[10px] text-gray-400 leading-relaxed">
-          First language = editor preview &amp; AI generate. All selected = included in Locale bundle export.
+          Generate writes copy for every selected language. First = editor preview;
+          switch &amp; edit the rest from the language tabs above the canvas. All selected = Locale bundle export.
         </p>
         <label class="mt-2 flex items-start gap-2 cursor-pointer select-none">
           <UCheckbox
@@ -732,13 +733,13 @@ function handleReset() {
               <div v-else class="w-5 h-5 rounded bg-gray-100 shrink-0 border border-gray-200" />
             </div>
             <input
-              :value="slide.label"
+              :value="slide?.label"
               placeholder="LABEL"
               class="w-full text-[11px] border border-gray-200 rounded px-2 py-1 mb-1 font-bold tracking-wider text-gray-700 bg-gray-50"
               @input="updateCopy(i, 'label', ($event.target as HTMLInputElement).value)"
             >
             <textarea
-              :value="slide.headline"
+              :value="slide?.headline"
               placeholder="Line one&#10;Line two"
               :rows="2"
               class="w-full text-xs border border-gray-200 rounded px-2 py-1 resize-y font-[inherit] text-gray-700 bg-gray-50"

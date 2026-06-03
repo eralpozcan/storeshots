@@ -3,8 +3,11 @@ import type { ComponentPublicInstance } from 'vue'
 import { toPng, getFontEmbedCSS } from 'html-to-image'
 import JSZip from 'jszip'
 import type { Device, Orientation, SlideElement } from '~/utils/types'
-import { FGW, FGH, STORE_PRESETS } from '~/utils/canvas'
-import type { StorePreset, PresetTarget } from '~/utils/canvas'
+import {
+  FGW, FGH, STORE_PRESETS,
+  IPHONE_SIZES, IPAD_SIZES, ANDROID_SIZES, ANDROID_7P_SIZES, ANDROID_10P_SIZES,
+} from '~/utils/canvas'
+import type { StorePreset } from '~/utils/canvas'
 import { SLIDE_COUNT_APPLE, SLIDE_COUNT_ANDROID, DEFAULT_CONFIG } from '~/utils/defaults'
 import { START_TEMPLATES, type StartTemplate } from '~/utils/templates'
 
@@ -22,12 +25,22 @@ useSeoMeta({
 const {
   config, device, orientation, sizeIdx, exporting, generating,
   ready, isTablet, canvasDims, slideConfig, sizePick,
-  updateConfig, generateCopy, generateFullDesign,
+  updateConfig, switchLocale, generateCopy, generateFullDesign,
   exportProject, importProject,
   extractColorsFromScreenshots,
   copyVariants, generateCopyVariants, applyVariant,
   getUploadedImages,
 } = useScreenshots()
+
+// Locale tab bar: shown when more than one language is selected. A language
+// has "content" once it's been generated/edited (present in copyByLocale).
+const localeTabs = computed(() => {
+  const sel = config.value.selectedLocales?.length ? config.value.selectedLocales : [config.value.locale]
+  return sel.map(code => ({
+    code,
+    hasCopy: !!config.value.copyByLocale?.[code]?.length,
+  }))
+})
 
 // Variants modal — opened from the AI step / variants button.
 const variantsOpen = ref(false)
@@ -245,7 +258,7 @@ function setRef(i: number, el: Element | ComponentPublicInstance | null) {
 // - drop html2canvas-only opts (allowTaint/useCORS) that html-to-image ignores
 // - drop forced white backgroundColor so transparent/dark designs survive
 // - cacheBust: true so stale cached assets don't re-introduce blank frames
-// - pixelRatio: 2 for sharper store screenshots
+// - pixelRatio: 1 so output matches the exact store pixel dimensions
 // - shorter wait (rAF + small timeout) once fonts.ready resolves
 // - try/finally guarantees the capture container is removed on error
 async function captureElement(el: HTMLElement, tw: number, th: number): Promise<string> {
@@ -285,7 +298,10 @@ async function captureElement(el: HTMLElement, tw: number, th: number): Promise<
   container.offsetHeight
   clone.offsetHeight
 
-  const opts = { width: tw, height: th, pixelRatio: 2, cacheBust: true, fontEmbedCSS }
+  // pixelRatio MUST be 1: tw/th are already the exact pixel dimensions the
+  // store requires. A ratio of 2 doubles the output (e.g. 1320×2868 → 2640×5736),
+  // which App Store Connect rejects as the wrong size.
+  const opts = { width: tw, height: th, pixelRatio: 1, cacheBust: true, fontEmbedCSS }
 
   try {
     try { await toPng(clone, opts) } catch (e) { console.warn('First toPng attempt failed:', e) }
@@ -342,251 +358,209 @@ function slideHasContent(i: number, variant: number): boolean {
 
 const toast = useToast()
 
-async function exportAll() {
-  if (device.value === 'feature-graphic') { await exportFG(); return }
-  const s = sizePick.value
-  const variants = slideVariants.value
-  let exported = 0
-  let skipped = 0
-  for (let i = 0; i < variants.length; i++) {
-    const el = exportRefs.value[i]
-    if (!el) continue
-    if (!slideHasContent(i, variants[i]!)) { skipped++; continue }
-    exporting.value = `${i + 1}/${variants.length}`
-    downloadPng(await captureElement(el, s.w, s.h), fname(i))
-    exported++
-    await new Promise(r => setTimeout(r, 420))
-  }
-  exporting.value = null
-  if (exported === 0 && skipped > 0) {
-    toast.add({
-      title: 'No screenshots to export',
-      description: 'Upload screenshots to your slides first, then try again.',
-      color: 'warning',
-      icon: 'i-lucide-image-off',
-      duration: 5000,
-    })
-  }
-  else if (skipped > 0) {
-    toast.add({
-      title: `Exported ${exported} slide${exported === 1 ? '' : 's'}`,
-      description: `${skipped} skipped — no screenshot uploaded.`,
-      color: 'info',
-      icon: 'i-lucide-info',
-      duration: 4000,
-    })
-  }
-}
-
 const slugLabel = (l: string) => l.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
 
-// Bundle export: switches device/orientation through every target in the preset,
-// captures every size for every slide, and ZIPs the result. The editor flickers
-// between devices during the run — that's expected; the overlay tells the user
-// not to close the tab.
-async function exportPreset(preset: StorePreset) {
+// ─── Configurable export ──────────────────────────────────────────────────
+// One export that fans out over languages × devices × sizes the user picks,
+// producing a single ZIP nested as <locale>/<device>/<size>/NN-label.png.
+type ExportDeviceDef = {
+  device: Device
+  label: string
+  orientation: Orientation
+  sizes: readonly { label: string; w: number; h: number }[]
+}
+
+const EXPORT_DEVICES: ExportDeviceDef[] = [
+  { device: 'iphone', label: 'iPhone', orientation: 'portrait', sizes: IPHONE_SIZES },
+  { device: 'ipad', label: 'iPad', orientation: 'portrait', sizes: IPAD_SIZES },
+  { device: 'android', label: 'Android Phone', orientation: 'portrait', sizes: ANDROID_SIZES },
+  { device: 'android-7', label: 'Android 7" Tablet', orientation: 'portrait', sizes: ANDROID_7P_SIZES },
+  { device: 'android-10', label: 'Android 10" Tablet', orientation: 'portrait', sizes: ANDROID_10P_SIZES },
+]
+
+const sizeKey = (d: Device, label: string) => `${d}::${label}`
+
+// Checkbox state. exportSizeSel keys are `${device}::${sizeLabel}`.
+const exportLocaleSel = ref<Record<string, boolean>>({})
+const exportSizeSel = ref<Record<string, boolean>>({})
+const exportPopoverOpen = ref(false)
+
+function defaultExportSelection() {
+  // Languages: every selected locale on by default.
+  const locales = config.value.selectedLocales?.length ? config.value.selectedLocales : [config.value.locale]
+  const ls: Record<string, boolean> = {}
+  for (const l of locales) ls[l] = true
+  exportLocaleSel.value = ls
+  // Sizes: every size of the device currently being edited, on by default.
+  const ss: Record<string, boolean> = {}
+  const cur = EXPORT_DEVICES.find(d => d.device === device.value) ?? EXPORT_DEVICES[0]!
+  for (const sz of cur.sizes) ss[sizeKey(cur.device, sz.label)] = true
+  exportSizeSel.value = ss
+}
+
+function openExport() {
+  defaultExportSelection()
+  exportPopoverOpen.value = true
+}
+
+function toggleLocale(code: string) {
+  exportLocaleSel.value = { ...exportLocaleSel.value, [code]: !exportLocaleSel.value[code] }
+}
+function toggleSize(d: Device, label: string) {
+  const k = sizeKey(d, label)
+  exportSizeSel.value = { ...exportSizeSel.value, [k]: !exportSizeSel.value[k] }
+}
+
+// Quick-fill from a store preset: check exactly that preset's device/size set.
+function applyExportPreset(preset: StorePreset) {
+  const ss: Record<string, boolean> = {}
+  for (const t of preset.targets) {
+    for (const sz of t.sizes) ss[sizeKey(t.device, sz.label)] = true
+  }
+  exportSizeSel.value = ss
+}
+
+const exportLocales = computed(() =>
+  Object.entries(exportLocaleSel.value).filter(([, v]) => v).map(([k]) => k),
+)
+
+// Build {device, orientation, sizes[]} targets from the checked sizes.
+const exportTargets = computed(() =>
+  EXPORT_DEVICES
+    .map(d => ({
+      device: d.device,
+      orientation: d.orientation,
+      sizes: d.sizes.filter(sz => exportSizeSel.value[sizeKey(d.device, sz.label)]),
+    }))
+    .filter(t => t.sizes.length > 0),
+)
+
+// Run async tasks with a concurrency cap. The editor renders one device frame
+// at a time, but the slides within a frame are independent DOM nodes, so they
+// can be captured concurrently to speed up large multi-target exports. Capped
+// low (3) because html-to-image is CPU/memory heavy and the main thread is
+// shared — more in flight just thrashes.
+const CAPTURE_CONCURRENCY = 3
+async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let cursor = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const idx = cursor++
+      await fn(items[idx]!)
+    }
+  })
+  await Promise.all(workers)
+}
+
+async function exportConfigured() {
+  const locales = exportLocales.value
+  const targets = exportTargets.value
+  if (!locales.length) {
+    toast.add({ title: 'Pick a language', description: 'Select at least one language to export.', color: 'warning', icon: 'i-lucide-languages' })
+    return
+  }
+  if (!targets.length) {
+    toast.add({ title: 'Pick a size', description: 'Select at least one device size to export.', color: 'warning', icon: 'i-lucide-smartphone' })
+    return
+  }
+  exportPopoverOpen.value = false
+
   const origDevice = device.value
   const origOrientation = orientation.value
   const origSizeIdx = sizeIdx.value
-
-  const zip = new JSZip()
-  const appSlug = slugLabel(config.value.appName || 'app') || 'app'
-  let totalCaptured = 0
-  let presetExported = 0
-  let presetSkipped = 0
-  const totalToCapture = preset.targets.reduce((acc: number, t: PresetTarget) => {
-    const variantCount = (t.device === 'iphone' || t.device === 'ipad')
-      ? SLIDE_COUNT_APPLE
-      : SLIDE_COUNT_ANDROID
-    return acc + (variantCount * t.sizes.length)
-  }, 0)
-
-  try {
-    for (const target of preset.targets) {
-      device.value = target.device
-      orientation.value = target.orientation
-      sizeIdx.value = 0
-      // Wait for the editor DOM to swap to the new device frame and lay out.
-      await nextTick()
-      await new Promise(r => setTimeout(r, 700))
-
-      const variants = slideVariants.value
-      for (const size of target.sizes) {
-        const folderName = `${target.device}-${slugLabel(size.label)}-${size.w}x${size.h}`
-        const folder = zip.folder(folderName)
-        if (!folder) continue
-        for (let i = 0; i < variants.length; i++) {
-          const el = exportRefs.value[i]
-          if (!el) continue
-          if (!slideHasContent(i, variants[i]!)) { presetSkipped++; continue }
-          totalCaptured++
-          exporting.value = `${preset.label} · ${totalCaptured}/${totalToCapture}`
-          const dataUrl = await captureElement(el, size.w, size.h)
-          const lbl = slugLabel(config.value.copy[i]?.label || '') || 'slide'
-          const filename = `${String(i + 1).padStart(2, '0')}-${lbl}.png`
-          folder.file(filename, dataUrl.split(',')[1] || '', { base64: true })
-          presetExported++
-        }
-      }
-    }
-
-    if (presetExported === 0) {
-      toast.add({
-        title: 'Nothing to export',
-        description: 'No screenshots uploaded yet. Add screenshots to your slides first.',
-        color: 'warning',
-        icon: 'i-lucide-image-off',
-        duration: 5000,
-      })
-      return
-    }
-    exporting.value = 'Zipping…'
-    const blob = await zip.generateAsync({ type: 'blob' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${appSlug}-${preset.key}.zip`
-    a.click()
-    URL.revokeObjectURL(url)
-    if (presetSkipped > 0) {
-      toast.add({
-        title: `${preset.label} bundle ready`,
-        description: `${presetExported} captured · ${presetSkipped} skipped (no screenshot uploaded for those slides).`,
-        color: 'info',
-        icon: 'i-lucide-info',
-        duration: 5000,
-      })
-    }
-  }
-  finally {
-    device.value = origDevice
-    orientation.value = origOrientation
-    sizeIdx.value = origSizeIdx
-    exporting.value = null
-  }
-}
-
-async function exportMultiLocale() {
-  const locales = config.value.selectedLocales
-  if (!locales?.length || !config.value.ai.apiKey) return
-
-  const zip = new JSZip()
-  const appSlug = slugLabel(config.value.appName || 'app') || 'app'
   const origCopy = config.value.copy.map(c => ({ ...c }))
-  const s = sizePick.value
-  let totalExported = 0
 
-  // Build copy map: locale → SlideCopy[]
+  // Phase 1 — resolve copy for every selected locale (prefer stored/edited,
+  // generate the missing ones if an AI key is present).
   const copyMap: Record<string, { label: string; headline: string }[]> = {}
+  for (const loc of locales) {
+    const existing = config.value.copyByLocale?.[loc]
+    if (existing?.length) copyMap[loc] = existing.map(c => ({ ...c }))
+  }
+  const missing = locales.filter(l => !copyMap[l]?.length)
+  if (missing.length && !config.value.ai.apiKey) {
+    toast.add({
+      title: 'API key missing',
+      description: `No copy yet for: ${missing.join(', ')}. Add an AI key to generate them, or deselect those languages.`,
+      color: 'warning', icon: 'i-lucide-key', duration: 6000,
+    })
+    return
+  }
 
+  let exported = 0
+  let skipped = 0
   try {
-    if (locales.length > 1 && config.value.batchLocaleGenerate) {
-      // Batch mode: single API call, all locales at once (higher output tokens)
-      exporting.value = `Generating ${locales.length} languages…`
-      try {
-        const images = await getUploadedImages()
-        const res = await $fetch('/api/generate-copy', {
-          method: 'POST',
-          body: {
-            provider: config.value.ai.provider,
-            apiKey: config.value.ai.apiKey,
-            openrouterModel: config.value.ai.openrouterModel,
-            claudeModel: config.value.ai.claudeModel,
-            appName: config.value.appName,
-            appDescription: config.value.appDescription,
-            features: config.value.features,
-            slideCount: config.value.copy.length,
-            locales,
-            mode: 'copy-only',
-            images,
-          },
-        }) as { locales?: Record<string, any[]> }
-        for (const locale of locales) {
-          const slides = res.locales?.[locale]
-          if (slides?.length) {
-            copyMap[locale] = slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
-          }
-        }
-      }
-      catch (e: any) {
-        toast.add({
-          title: 'Batch generation failed',
-          description: e?.data?.statusMessage || e?.message || 'Unknown error',
-          color: 'error',
-          icon: 'i-lucide-triangle-alert',
-          duration: 5000,
-        })
-        return
-      }
-    }
-    else {
-      // Sequential mode: one call per locale (default)
+    if (missing.length) {
       const images = await getUploadedImages()
-      for (const locale of locales) {
-        exporting.value = `Generating ${locale}…`
+      for (const loc of missing) {
+        exporting.value = `Generating ${loc}…`
         try {
           const res = await $fetch('/api/generate-copy', {
             method: 'POST',
             body: {
-              provider: config.value.ai.provider,
-              apiKey: config.value.ai.apiKey,
-              openrouterModel: config.value.ai.openrouterModel,
-              claudeModel: config.value.ai.claudeModel,
-              appName: config.value.appName,
-              appDescription: config.value.appDescription,
-              features: config.value.features,
-              slideCount: config.value.copy.length,
-              locale,
-              mode: 'copy-only',
-              images,
+              provider: config.value.ai.provider, apiKey: config.value.ai.apiKey,
+              openrouterModel: config.value.ai.openrouterModel, claudeModel: config.value.ai.claudeModel,
+              appName: config.value.appName, appDescription: config.value.appDescription,
+              features: config.value.features, slideCount: config.value.copy.length,
+              locale: loc, mode: 'copy-only', images,
             },
           }) as { slides?: any[] }
-          if (res.slides?.length) {
-            copyMap[locale] = res.slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
-          }
+          if (res.slides?.length) copyMap[loc] = res.slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
         }
         catch (e: any) {
-          toast.add({
-            title: `Generation failed for ${locale}`,
-            description: e?.data?.statusMessage || e?.message || 'Unknown error',
-            color: 'error',
-            icon: 'i-lucide-triangle-alert',
-            duration: 5000,
+          toast.add({ title: `Generation failed for ${loc}`, description: e?.data?.statusMessage || e?.message || 'Unknown error', color: 'error', icon: 'i-lucide-triangle-alert', duration: 5000 })
+        }
+      }
+    }
+
+    const zip = new JSZip()
+    const appSlug = slugLabel(config.value.appName || 'app') || 'app'
+    const nestLocale = locales.length > 1
+
+    // Phase 2 — capture locale × device × size into nested folders.
+    for (const loc of locales) {
+      const localeCopy = copyMap[loc]
+      if (!localeCopy?.length) continue
+      // Swap rendered copy; pass copyByLocale so write-through doesn't pollute.
+      updateConfig({ copy: localeCopy, copyByLocale: config.value.copyByLocale })
+
+      for (const target of targets) {
+        device.value = target.device
+        orientation.value = target.orientation
+        sizeIdx.value = 0
+        await nextTick()
+        await new Promise(r => setTimeout(r, 650))
+
+        const variants = slideVariants.value
+        for (const size of target.sizes) {
+          const sizeFolder = `${slugLabel(size.label)}-${size.w}x${size.h}`
+          const path = [nestLocale ? loc : null, target.device, sizeFolder].filter(Boolean).join('/')
+          const folder = zip.folder(path)
+          if (!folder) continue
+
+          // Slides in this frame are already rendered as independent nodes, so
+          // capture them concurrently (capped). Skips are counted up front.
+          const slideIdxs: number[] = []
+          for (let i = 0; i < variants.length; i++) {
+            if (!exportRefs.value[i] || !slideHasContent(i, variants[i]!)) { skipped++; continue }
+            slideIdxs.push(i)
+          }
+          let done = 0
+          await mapLimit(slideIdxs, CAPTURE_CONCURRENCY, async (i) => {
+            const el = exportRefs.value[i]!
+            const dataUrl = await captureElement(el, size.w, size.h)
+            const lbl = slugLabel(config.value.copy[i]?.label || '') || 'slide'
+            folder.file(`${String(i + 1).padStart(2, '0')}-${lbl}.png`, dataUrl.split(',')[1] || '', { base64: true })
+            exported++
+            done++
+            exporting.value = `${nestLocale ? loc + ' · ' : ''}${target.device} ${size.label} · ${done}/${slideIdxs.length}`
           })
         }
       }
     }
 
-    // Sequential capture per locale
-    for (const locale of locales) {
-      const newCopy = copyMap[locale]
-      if (!newCopy?.length) continue
-
-      updateConfig({ copy: newCopy })
-      await nextTick()
-      await new Promise(r => setTimeout(r, 600))
-
-      const folder = zip.folder(locale)
-      const variants = slideVariants.value
-      for (let i = 0; i < variants.length; i++) {
-        const el = exportRefs.value[i]
-        if (!el || !slideHasContent(i, variants[i]!)) continue
-        exporting.value = `${locale} · ${i + 1}/${variants.length}`
-        const dataUrl = await captureElement(el, s.w, s.h)
-        const lbl = slugLabel(config.value.copy[i]?.label || '') || 'slide'
-        folder?.file(`${String(i + 1).padStart(2, '0')}-${lbl}.png`, dataUrl.split(',')[1] || '', { base64: true })
-        totalExported++
-      }
-    }
-
-    if (totalExported === 0) {
-      toast.add({
-        title: 'Nothing exported',
-        description: 'Upload screenshots first or check your API key.',
-        color: 'warning',
-        icon: 'i-lucide-image-off',
-        duration: 5000,
-      })
+    if (exported === 0) {
+      toast.add({ title: 'Nothing exported', description: 'Upload screenshots to your slides first.', color: 'warning', icon: 'i-lucide-image-off', duration: 5000 })
       return
     }
 
@@ -595,19 +569,21 @@ async function exportMultiLocale() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${appSlug}-locales.zip`
+    a.download = `${appSlug}-export.zip`
     a.click()
     URL.revokeObjectURL(url)
     toast.add({
-      title: 'Locale bundle ready',
-      description: `${locales.length} language${locales.length > 1 ? 's' : ''} · ${totalExported} slides exported`,
-      color: 'success',
-      icon: 'i-lucide-languages',
-      duration: 5000,
+      title: 'Export ready',
+      description: `${exported} screenshot${exported === 1 ? '' : 's'} · ${locales.length} lang × ${targets.length} device target${targets.length === 1 ? '' : 's'}`,
+      color: 'success', icon: 'i-lucide-download', duration: 5000,
     })
   }
   finally {
-    updateConfig({ copy: origCopy })
+    // Persist any generated locales + restore the editing view.
+    updateConfig({ copy: origCopy, copyByLocale: { ...config.value.copyByLocale, ...copyMap } })
+    device.value = origDevice
+    orientation.value = origOrientation
+    sizeIdx.value = origSizeIdx
     exporting.value = null
   }
 }
@@ -626,19 +602,6 @@ const projectMenuItems = computed(() => [
     onSelect: triggerImport,
   },
 ])
-
-const presetMenuItems = computed(() =>
-  STORE_PRESETS.map(preset => ({
-    label: preset.label,
-    description: preset.description,
-    icon: preset.key === 'app-store'
-      ? 'i-lucide-apple'
-      : preset.key === 'play-store'
-        ? 'i-lucide-play'
-        : 'i-lucide-package',
-    onSelect: () => exportPreset(preset),
-  })),
-)
 
 const deviceOptions: { label: string; value: Device }[] = [
   { label: 'iPhone', value: 'iphone' },
@@ -675,7 +638,10 @@ function onKeydown(e: KeyboardEvent) {
   const meta = e.metaKey || e.ctrlKey
   if (meta && e.key.toLowerCase() === 'e') {
     e.preventDefault()
-    if (!exporting.value) exportAll()
+    if (!exporting.value) {
+      if (device.value === 'feature-graphic') exportFG()
+      else openExport()
+    }
     return
   }
   if (meta && e.key.toLowerCase() === 'g') {
@@ -795,39 +761,86 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               class="hidden"
               @change="onImportFile"
             >
-            <UButton
-              size="sm"
-              :loading="!!exporting"
-              :disabled="!!exporting"
-              @click="exportAll"
-            >
-              {{ exporting ? `Exporting… ${exporting}` : 'Export All' }}
-            </UButton>
-            <UDropdownMenu
-              :items="presetMenuItems"
-              :disabled="!!exporting || device === 'feature-graphic'"
-            >
+            <UPopover v-model:open="exportPopoverOpen">
               <UButton
-                color="neutral"
-                variant="outline"
-                icon="i-lucide-package"
+                size="sm"
+                icon="i-lucide-download"
+                :loading="!!exporting"
                 :disabled="!!exporting || device === 'feature-graphic'"
+                :title="device === 'feature-graphic' ? 'Use the Download button for the feature graphic' : 'Export languages × devices × sizes'"
+                @click="openExport"
               >
-                Bundle
+                {{ exporting ? `Exporting… ${exporting}` : 'Export' }}
               </UButton>
-            </UDropdownMenu>
-            <UButton
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-languages"
-              size="sm"
-              :loading="!!exporting"
-              :disabled="!!exporting || !config.ai.apiKey || !config.selectedLocales?.length"
-              :title="!config.ai.apiKey ? 'Add an AI key to use locale export' : `Export in ${config.selectedLocales?.length ?? 1} language${(config.selectedLocales?.length ?? 1) > 1 ? 's' : ''}`"
-              @click="exportMultiLocale"
-            >
-              Locales
-            </UButton>
+              <template #content>
+                <div class="p-3 w-72 space-y-3">
+                  <!-- Languages -->
+                  <div v-if="Object.keys(exportLocaleSel).length">
+                    <p class="text-[11px] font-semibold text-gray-700 mb-1">Languages</p>
+                    <div class="flex flex-wrap gap-x-3 gap-y-1">
+                      <label
+                        v-for="code in Object.keys(exportLocaleSel)"
+                        :key="code"
+                        class="flex items-center gap-1 text-xs cursor-pointer"
+                      >
+                        <UCheckbox
+                          :model-value="exportLocaleSel[code]"
+                          @update:model-value="toggleLocale(code)"
+                        />
+                        {{ code.toUpperCase() }}
+                      </label>
+                    </div>
+                  </div>
+                  <!-- Devices + sizes -->
+                  <div>
+                    <div class="flex items-center justify-between mb-1">
+                      <p class="text-[11px] font-semibold text-gray-700">Devices &amp; sizes</p>
+                      <div class="flex gap-1.5">
+                        <button
+                          v-for="p in STORE_PRESETS"
+                          :key="p.key"
+                          type="button"
+                          class="text-[10px] text-blue-600 hover:underline"
+                          @click="applyExportPreset(p)"
+                        >
+                          {{ p.label }}
+                        </button>
+                      </div>
+                    </div>
+                    <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      <div
+                        v-for="d in EXPORT_DEVICES"
+                        :key="d.device"
+                      >
+                        <p class="text-[11px] font-medium text-gray-500">{{ d.label }}</p>
+                        <div class="flex flex-wrap gap-x-3 gap-y-1 mt-0.5">
+                          <label
+                            v-for="sz in d.sizes"
+                            :key="sz.label"
+                            class="flex items-center gap-1 text-[11px] cursor-pointer"
+                          >
+                            <UCheckbox
+                              :model-value="!!exportSizeSel[sizeKey(d.device, sz.label)]"
+                              @update:model-value="toggleSize(d.device, sz.label)"
+                            />
+                            {{ sz.label }}
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <UButton
+                    block
+                    size="sm"
+                    icon="i-lucide-download"
+                    :disabled="!!exporting"
+                    @click="exportConfigured"
+                  >
+                    Export ZIP
+                  </UButton>
+                </div>
+              </template>
+            </UPopover>
           </div>
         </div>
 
@@ -897,6 +910,36 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               {{ s.label }} — {{ s.w }}×{{ s.h }}
             </option>
           </select>
+        </div>
+
+        <!-- Row 3: language tabs (multi-locale editing) -->
+        <div
+          v-if="localeTabs.length > 1"
+          class="flex items-center gap-2 px-4 py-1.5 border-t border-gray-100 overflow-x-auto"
+        >
+          <UIcon
+            name="i-lucide-languages"
+            class="size-4 text-gray-400 shrink-0"
+          />
+          <div class="flex gap-1 bg-gray-100 rounded-lg p-1 items-center shrink-0">
+            <button
+              v-for="t in localeTabs"
+              :key="t.code"
+              class="px-3 py-1 rounded-md border-none cursor-pointer text-xs font-semibold whitespace-nowrap flex items-center gap-1"
+              :class="config.locale === t.code ? 'bg-white text-blue-600 shadow-sm' : 'bg-transparent text-gray-500'"
+              :title="t.hasCopy ? 'Edited / generated' : 'Not generated yet'"
+              @click="switchLocale(t.code)"
+            >
+              {{ t.code.toUpperCase() }}
+              <span
+                v-if="t.hasCopy"
+                class="size-1.5 rounded-full bg-emerald-500 shrink-0"
+              />
+            </button>
+          </div>
+          <span class="text-[10px] text-gray-400 whitespace-nowrap">
+            Generate in the sidebar · edits saved per language.
+          </span>
         </div>
       </div>
 

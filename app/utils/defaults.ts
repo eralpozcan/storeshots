@@ -26,6 +26,7 @@ export const DEFAULT_CONFIG: UserConfig = {
     label: i === SLIDE_COUNT - 1 ? 'TRUST' : `FEATURE ${i + 1}`,
     headline: i === SLIDE_COUNT - 1 ? 'Built for\nyou.' : 'Your headline\nhere.',
   })),
+  copyByLocale: {},
   images: {
     iphone: [...EMPTY_IMAGES],
     ipad: [...EMPTY_IMAGES],
@@ -66,6 +67,9 @@ export function loadConfig(): UserConfig {
       images: { ...DEFAULT_CONFIG.images, ...parsed.images },
       ai: { ...DEFAULT_CONFIG.ai, ...parsed.ai, apiKey: sessionKey },
       copy: parsed.copy?.length ? parsed.copy : DEFAULT_CONFIG.copy,
+      copyByLocale: (parsed.copyByLocale && typeof parsed.copyByLocale === 'object')
+        ? parsed.copyByLocale
+        : {},
       features: parsed.features ?? DEFAULT_CONFIG.features,
       locale: parsed.locale ?? DEFAULT_CONFIG.locale,
       selectedLocales: Array.isArray(parsed.selectedLocales) && parsed.selectedLocales.length

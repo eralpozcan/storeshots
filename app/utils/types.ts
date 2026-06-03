@@ -98,6 +98,10 @@ export type UserConfig = {
   appIcon: string | null
   colors: BrandColors
   copy: SlideCopy[]
+  // Per-locale copy store. `copy` always mirrors the active locale
+  // (`locale`); copyByLocale holds the saved copy for every generated /
+  // edited language so the editor can switch between them without losing work.
+  copyByLocale: Record<string, SlideCopy[]>
   images: {
     iphone: DeviceImages
     ipad: DeviceImages
