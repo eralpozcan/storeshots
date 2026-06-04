@@ -3,7 +3,7 @@ import { DEFAULT_FONT_FAMILY } from './fonts'
 
 export const SLIDE_COUNT = 10
 export const SLIDE_COUNT_APPLE = 10
-export const SLIDE_COUNT_ANDROID = 8
+export const SLIDE_COUNT_ANDROID = 10
 
 export const EMPTY_IMAGES = Array(SLIDE_COUNT).fill(null)
 

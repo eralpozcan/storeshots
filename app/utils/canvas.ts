@@ -174,10 +174,12 @@ const variant1: SlideElement[] = [
 ]
 
 // Variant 2: caption top, two phones — back rotated -5° left, front right.
+// Both phones show THIS slide's screenshot (the back one as a faded echo) so
+// each uploaded screenshot maps 1:1 to a slide with no cross-slide repeat.
 const variant2: SlideElement[] = [
   captionTop,
   {
-    id: 'device-bg', type: 'device', imageIdx: 0, widthRole: 'secondary', widthMul: 0.82,
+    id: 'device-bg', type: 'device', imageIdx: 1, widthRole: 'secondary', widthMul: 0.82,
     x: -5, y: -3, anchor: 'bl', rotate: -5, opacity: 0.45,
     shadow: { color: 'black', alpha: 0.12, y: 20, blur: 40 },
     zIndex: 3,
@@ -224,6 +226,8 @@ const variant5: SlideElement[] = [
 ]
 
 // Variant 6: caption top, two phones — back rotated 4° right, front left.
+// Both phones show THIS slide's screenshot (the back one as a faded echo) so
+// each uploaded screenshot maps 1:1 to a slide with no cross-slide repeat.
 const variant6: SlideElement[] = [
   captionTop,
   {
@@ -233,7 +237,7 @@ const variant6: SlideElement[] = [
     zIndex: 3,
   },
   {
-    id: 'device-fg', type: 'device', imageIdx: 6, widthRole: 'secondary',
+    id: 'device-fg', type: 'device', imageIdx: 5, widthRole: 'secondary',
     x: -3, y: -3, anchor: 'bl',
     shadow: { color: 'primary', alpha: 0x33 / 255 },
     zIndex: 5,

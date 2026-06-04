@@ -6,6 +6,19 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **Android listings now use all 10 slides** (was 8), matching the App Store, so
+  the last two screenshots are no longer dropped and there's more room for
+  alternative layouts.
+
+### Fixed
+- **Screenshots no longer repeat across slides**. The two paired-device layouts
+  reused a neighbouring slide's screenshot (slides 1 & 2 shared the first, slides
+  6 & 7 shared the seventh), so one uploaded screenshot appeared twice while
+  another went unused. Each slide now maps 1:1 to its own screenshot; the paired
+  layouts show that slide's screenshot as a faded echo behind the main device.
+  Applies to both App Store and Play Store layouts.
+
 ## [0.10.0] — 2026-06-04
 
 ### Added
