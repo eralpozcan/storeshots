@@ -6,6 +6,13 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Cookie consent is now stored in a small first-party cookie
+  (`storeshots_consent`, ~120 bytes) instead of localStorage, so it travels
+  with the request (readable during SSR) and stays minimal. A returning
+  visitor's existing localStorage consent is migrated into the cookie once and
+  the old key is cleared, so nobody is re-prompted.
+
 ## [0.9.0] — 2026-06-04
 
 ### Added

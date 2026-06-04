@@ -3,7 +3,7 @@
 // and localStorage for editor preferences — both are strictly necessary. This composable is designed so analytics,
 // marketing, or third-party embeds can be gated behind granular consent *before* they ever load.
 //
-// Consent is persisted in localStorage under a versioned key so a change to the policy invalidates old consent.
+// Consent is persisted in a small first-party cookie under a versioned key so a change to the policy invalidates old consent.
 
 export type CookieCategory = 'necessary' | 'functional' | 'analytics' | 'marketing'
 
@@ -16,7 +16,13 @@ export interface CookieConsentState {
 // Bump this version when the cookie policy changes materially.
 // Existing consent will be invalidated and users will be re-asked.
 export const COOKIE_CONSENT_VERSION = 1
-const STORAGE_KEY = 'storeshots:cookie-consent'
+// Consent itself lives in a small first-party cookie (~120 bytes) so it travels
+// with the request (usable during SSR) and stays standard. The legacy key is
+// the old localStorage slot, kept only to migrate existing visitors once.
+const CONSENT_COOKIE = 'storeshots_consent'
+const LEGACY_STORAGE_KEY = 'storeshots:cookie-consent'
+// ~180 days — long enough to avoid re-prompting, short enough to be re-asked.
+const CONSENT_MAX_AGE = 60 * 60 * 24 * 180
 
 const defaultState = (): CookieConsentState => ({
   version: COOKIE_CONSENT_VERSION,
@@ -39,28 +45,31 @@ function syncAnalyticsConsent(granted: boolean) {
   else scriptsConsent.revoke()
 }
 
-function readStored(): CookieConsentState | null {
+function isValidState(s: unknown): s is CookieConsentState {
+  return !!s && typeof s === 'object'
+    && (s as CookieConsentState).version === COOKIE_CONSENT_VERSION
+    && typeof (s as CookieConsentState).categories === 'object'
+}
+
+// One-time migration: pull consent out of the old localStorage slot (if any)
+// so existing visitors aren't re-prompted, then clear it.
+function readLegacyLocalStorage(): CookieConsentState | null {
   if (import.meta.server) return null
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as CookieConsentState
-    if (parsed.version !== COOKIE_CONSENT_VERSION) return null
-    return parsed
+    const parsed = JSON.parse(raw)
+    return isValidState(parsed) ? parsed : null
   }
   catch {
     return null
   }
 }
 
-function writeStored(next: CookieConsentState) {
+function clearLegacyLocalStorage() {
   if (import.meta.server) return
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-  }
-  catch {
-    // storage may be full or blocked — silently fail, consent just won't persist
-  }
+  try { localStorage.removeItem(LEGACY_STORAGE_KEY) }
+  catch { /* noop */ }
 }
 
 function respectsDoNotTrack(): boolean {
@@ -72,9 +81,31 @@ function respectsDoNotTrack(): boolean {
 }
 
 export function useCookieConsent() {
+  // Consent persists in a small first-party cookie. useCookie JSON-encodes the
+  // value and dedupes by key across calls, so every useCookieConsent() shares
+  // the same cookie ref.
+  const consentCookie = useCookie<CookieConsentState | null>(CONSENT_COOKIE, {
+    maxAge: CONSENT_MAX_AGE,
+    sameSite: 'lax',
+    path: '/',
+    secure: !import.meta.dev,
+  })
+  function persist(next: CookieConsentState) {
+    consentCookie.value = next
+  }
+
   // Lazy hydration on client mount
   if (import.meta.client && !loaded.value) {
-    const stored = readStored()
+    let stored = isValidState(consentCookie.value) ? consentCookie.value : null
+    // Migrate a returning visitor's old localStorage consent into the cookie.
+    if (!stored) {
+      const legacy = readLegacyLocalStorage()
+      if (legacy) {
+        stored = legacy
+        persist(legacy)
+        clearLegacyLocalStorage()
+      }
+    }
     if (stored) {
       state.value = stored
       syncAnalyticsConsent(stored.categories.analytics)
@@ -100,7 +131,7 @@ export function useCookieConsent() {
       timestamp: Date.now(),
       categories: { necessary: true, functional: true, analytics: true, marketing: true },
     }
-    writeStored(state.value)
+    persist(state.value)
     syncAnalyticsConsent(true)
     bannerVisible.value = false
   }
@@ -111,7 +142,7 @@ export function useCookieConsent() {
       timestamp: Date.now(),
       categories: { necessary: true, functional: false, analytics: false, marketing: false },
     }
-    writeStored(state.value)
+    persist(state.value)
     syncAnalyticsConsent(false)
     bannerVisible.value = false
   }
@@ -127,16 +158,14 @@ export function useCookieConsent() {
         marketing: next.marketing ?? state.value.categories.marketing,
       },
     }
-    writeStored(state.value)
+    persist(state.value)
     syncAnalyticsConsent(state.value.categories.analytics)
     bannerVisible.value = false
   }
 
   function revoke() {
-    if (import.meta.client) {
-      try { localStorage.removeItem(STORAGE_KEY) }
-      catch { /* noop */ }
-    }
+    consentCookie.value = null
+    clearLegacyLocalStorage()
     state.value = defaultState()
     syncAnalyticsConsent(false)
     bannerVisible.value = true
