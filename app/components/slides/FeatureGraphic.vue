@@ -6,7 +6,7 @@ defineProps<{ cfg: SlideConfig }>()
 </script>
 
 <template>
-  <div :style="{ width: `${FGW}px`, height: `${FGH}px`, position: 'relative', overflow: 'hidden', background: `linear-gradient(135deg,${cfg.colors.bgFrom} 0%,${cfg.colors.bgTo} 100%)`, fontFamily: 'Inter,sans-serif', display: 'flex', alignItems: 'center' }">
+  <div :style="{ width: `${FGW}px`, height: `${FGH}px`, position: 'relative', overflow: 'hidden', background: `linear-gradient(135deg,${cfg.colors.bgFrom} 0%,${cfg.colors.bgTo} 100%)`, fontFamily: cfg.fontFamily, display: 'flex', alignItems: 'center' }">
     <div :style="{ position: 'absolute', borderRadius: '50%', background: cfg.colors.primary, opacity: 0.18, filter: 'blur(60px)', width: '500px', height: '500px', top: '-150px', left: '-100px' }" />
     <div :style="{ position: 'absolute', borderRadius: '50%', background: cfg.colors.accent, opacity: 0.12, filter: 'blur(60px)', width: '350px', height: '350px', bottom: '-120px', right: '-60px' }" />
     <div :style="{ display: 'flex', alignItems: 'center', gap: '28px', paddingLeft: '56px', position: 'relative', zIndex: 5, flexShrink: '0' }">

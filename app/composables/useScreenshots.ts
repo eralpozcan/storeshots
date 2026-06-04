@@ -1,6 +1,7 @@
 import type { UserConfig, Device, Orientation, SlideConfig } from '~/utils/types'
 import { loadConfig, saveConfig, DEFAULT_CONFIG } from '~/utils/defaults'
 import { extractPalette } from '~/utils/color-extract'
+import { resolveFontStack } from '~/utils/fonts'
 import {
   W, H, AW, AH, AT7P_W, AT7P_H, AT7L_W, AT7L_H,
   AT10P_W, AT10P_H, AT10L_W, AT10L_H, IPAD_W, IPAD_H, FGW, FGH,
@@ -123,6 +124,7 @@ export function useScreenshots() {
       appIcon: c.appIcon,
       appName: c.appName,
       features: c.features,
+      fontFamily: resolveFontStack(c.fontFamily, !!c.customFont),
     }
   })
 

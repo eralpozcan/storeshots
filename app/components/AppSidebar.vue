@@ -2,6 +2,10 @@
 import type { ComponentPublicInstance } from 'vue'
 import type { UserConfig, SlideCopy, ImagesKey } from '~/utils/types'
 import { SLIDE_COUNT } from '~/utils/defaults'
+import {
+  BUILTIN_FONTS, fontFormatFromName, MAX_FONT_BYTES, ALLOWED_FONT_EXT,
+  DEFAULT_FONT_FAMILY, CUSTOM_FONT_VALUE, CUSTOM_FONT_STACK,
+} from '~/utils/fonts'
 
 const LOCALE_OPTIONS = [
   { label: '🇬🇧 English', value: 'en' },
@@ -272,6 +276,39 @@ const colorFields: [keyof UserConfig['colors'], string][] = [
   ['bgTo', 'BG To'],
 ]
 
+// Typeface
+const toast = useToast()
+const fontInputRef = ref<HTMLInputElement>()
+
+function selectFont(family: string) {
+  emit('change', { fontFamily: family })
+}
+
+async function onCustomFontSelect(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+  if (!ALLOWED_FONT_EXT.includes(ext as (typeof ALLOWED_FONT_EXT)[number])) {
+    toast.add({ title: 'Unsupported font', description: 'Use a .ttf, .otf, .woff or .woff2 file.', color: 'error', icon: 'i-lucide-triangle-alert' })
+    return
+  }
+  if (file.size > MAX_FONT_BYTES) {
+    toast.add({ title: 'Font too large', description: 'Keep custom fonts under 2 MB — a .woff2 is recommended.', color: 'error', icon: 'i-lucide-triangle-alert' })
+    return
+  }
+  const dataUrl = await handleFileUpload(file)
+  emit('change', {
+    customFont: { name: file.name, dataUrl, format: fontFormatFromName(file.name) },
+    fontFamily: CUSTOM_FONT_VALUE,
+  })
+}
+
+function removeCustomFont() {
+  emit('change', { customFont: null, fontFamily: DEFAULT_FONT_FAMILY })
+}
+
 function handleReset() {
   if (confirm('Reset all copy and colors? Screenshots will be cleared too.')) {
     localStorage.removeItem('screenshot-generator-config')
@@ -500,6 +537,65 @@ function handleReset() {
               @input="updateColors({ [key]: ($event.target as HTMLInputElement).value })"
             >
           </div>
+        </div>
+      </div>
+
+      <!-- Typeface -->
+      <div class="space-y-2 pt-1">
+        <div class="flex items-center justify-between gap-2">
+          <div class="text-[11px] font-semibold text-gray-600">Typeface</div>
+          <button
+            type="button"
+            class="text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer flex items-center gap-1 shrink-0"
+            title="Upload a custom .ttf / .otf / .woff / .woff2 font"
+            @click="fontInputRef?.click()"
+          >
+            <UIcon
+              name="i-lucide-upload"
+              class="size-3.5"
+            />
+            Upload
+          </button>
+        </div>
+        <input
+          ref="fontInputRef"
+          type="file"
+          accept=".ttf,.otf,.woff,.woff2,font/*"
+          class="hidden"
+          @change="onCustomFontSelect"
+        >
+        <div class="grid grid-cols-2 gap-1.5">
+          <button
+            v-for="f in BUILTIN_FONTS"
+            :key="f.family"
+            type="button"
+            class="h-9 rounded-md border px-2.5 text-left text-sm truncate transition-colors cursor-pointer"
+            :class="config.fontFamily === f.family
+              ? 'border-blue-500 bg-blue-50 text-gray-900'
+              : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300'"
+            :style="{ fontFamily: f.stack }"
+            @click="selectFont(f.family)"
+          >
+            {{ f.label }}
+          </button>
+          <button
+            v-if="config.customFont"
+            type="button"
+            class="col-span-2 h-9 rounded-md border px-2.5 text-left text-sm transition-colors cursor-pointer flex items-center justify-between gap-2"
+            :class="config.fontFamily === CUSTOM_FONT_VALUE
+              ? 'border-blue-500 bg-blue-50 text-gray-900'
+              : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300'"
+            :style="{ fontFamily: CUSTOM_FONT_STACK }"
+            @click="selectFont(CUSTOM_FONT_VALUE)"
+          >
+            <span class="truncate">{{ config.customFont.name }}</span>
+            <UIcon
+              name="i-lucide-x"
+              class="size-3.5 shrink-0 text-gray-400 hover:text-red-500"
+              title="Remove custom font"
+              @click.stop="removeCustomFont"
+            />
+          </button>
         </div>
       </div>
     </section>

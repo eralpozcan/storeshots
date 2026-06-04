@@ -10,6 +10,7 @@ import {
 import type { StorePreset } from '~/utils/canvas'
 import { SLIDE_COUNT_APPLE, SLIDE_COUNT_ANDROID, DEFAULT_CONFIG } from '~/utils/defaults'
 import { START_TEMPLATES, type StartTemplate } from '~/utils/templates'
+import { customFontFaceCss, injectCustomFont } from '~/utils/fonts'
 
 definePageMeta({ layout: false })
 
@@ -31,6 +32,13 @@ const {
   copyVariants, generateCopyVariants, applyVariant,
   getUploadedImages,
 } = useScreenshots()
+
+// Keep the uploaded custom font's @font-face injected so it renders in the
+// preview AND is reachable by getFontEmbedCSS during PNG export. Fires on mount
+// (covers reload / project import) and whenever the custom font changes.
+watch(() => config.value.customFont, (cf) => {
+  injectCustomFont(cf ? customFontFaceCss(cf.dataUrl, cf.format) : null)
+}, { immediate: true })
 
 // Locale tab bar: shown when more than one language is selected. A language
 // has "content" once it's been generated/edited (present in copyByLocale).
