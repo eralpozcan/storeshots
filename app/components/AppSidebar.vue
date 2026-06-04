@@ -106,14 +106,27 @@ const stepDone = computed(() => ({
   5: !!props.config.colors.primary,
 }))
 
-const DEVICE_LABELS: { key: ImagesKey; label: string }[] = [
-  { key: 'iphone', label: 'iPhone' },
-  { key: 'androidPhone', label: 'Android Phone' },
-  { key: 'androidTablet7P', label: 'Android 7" P' },
-  { key: 'androidTablet7L', label: 'Android 7" L' },
-  { key: 'androidTablet10P', label: 'Android 10" P' },
-  { key: 'androidTablet10L', label: 'Android 10" L' },
-  { key: 'ipad', label: 'iPad' },
+// Screenshot upload tabs, grouped by form factor so the Android tablet
+// portrait/landscape variants don't crowd a single flat row. Keys are unchanged
+// (one ImagesKey per device); only the layout is grouped.
+const DEVICE_GROUPS: { label: string; items: { key: ImagesKey; label: string }[] }[] = [
+  {
+    label: 'Phone',
+    items: [
+      { key: 'iphone', label: 'iPhone' },
+      { key: 'androidPhone', label: 'Android' },
+    ],
+  },
+  {
+    label: 'Tablet',
+    items: [
+      { key: 'ipad', label: 'iPad' },
+      { key: 'androidTablet7P', label: 'Android 7" ↕' },
+      { key: 'androidTablet7L', label: 'Android 7" ↔' },
+      { key: 'androidTablet10P', label: 'Android 10" ↕' },
+      { key: 'androidTablet10L', label: 'Android 10" ↔' },
+    ],
+  },
 ]
 
 function updateColors(patch: Partial<UserConfig['colors']>) {
@@ -632,16 +645,23 @@ function handleReset() {
         class="hidden"
         @change="onBulkUpload"
       >
-      <div class="flex gap-1 flex-wrap">
-        <button
-          v-for="d in DEVICE_LABELS"
-          :key="d.key"
-          class="text-[11px] px-2 py-0.5 rounded border cursor-pointer"
-          :class="activeDevice === d.key ? 'border-blue-500 bg-blue-50 text-blue-600 font-semibold' : 'border-gray-200 bg-white text-gray-700'"
-          @click="activeDevice = d.key"
+      <div class="space-y-1.5">
+        <div
+          v-for="g in DEVICE_GROUPS"
+          :key="g.label"
+          class="flex items-center gap-1.5 flex-wrap"
         >
-          {{ d.label }}
-        </button>
+          <span class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 w-9 shrink-0">{{ g.label }}</span>
+          <button
+            v-for="d in g.items"
+            :key="d.key"
+            class="text-[11px] px-2 py-0.5 rounded border cursor-pointer"
+            :class="activeDevice === d.key ? 'border-blue-500 bg-blue-50 text-blue-600 font-semibold' : 'border-gray-200 bg-white text-gray-700'"
+            @click="activeDevice = d.key"
+          >
+            {{ d.label }}
+          </button>
+        </div>
       </div>
       <div class="grid grid-cols-4 gap-1.5">
         <div

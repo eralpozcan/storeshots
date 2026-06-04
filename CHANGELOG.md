@@ -10,6 +10,9 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Android listings now use all 10 slides** (was 8), matching the App Store, so
   the last two screenshots are no longer dropped and there's more room for
   alternative layouts.
+- **Screenshot upload tabs are grouped by form factor** (Phone / Tablet) so the
+  Android tablet portrait/landscape variants no longer crowd one flat row; the
+  same devices are still there, just tidier.
 
 ### Fixed
 - **Screenshots no longer repeat across slides**. The two paired-device layouts
