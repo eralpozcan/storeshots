@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SlideElement, DeviceElement, CaptionElement, IconElement, Anchor } from '~/utils/types'
+import type { SlideElement, DeviceElement, CaptionElement, IconElement, TextElement, ChipsElement, Anchor } from '~/utils/types'
 import type { DeviceFrame } from '~/utils/canvas'
 import { DEVICE_WIDTH_FNS } from '~/utils/canvas'
 import { anchorSides, anchorTransform, combineTransform, dragDeltaToPatch } from '~/utils/anchor'
@@ -21,15 +21,23 @@ const props = defineProps<{
   cW: number
   cH: number
   deviceFrame: DeviceFrame
+  // Multiplier on the fixed-px handle/label chrome. The slide views render the
+  // canvas at native px then CSS-scale the whole thing down, so handles shrink
+  // for free (default 1). The Feature Graphic renders near 1:1, so it passes a
+  // smaller value (≈0.32/displayScale) to keep handles a constant screen size.
+  handleScale?: number
 }>()
+
+const hs = computed(() => props.handleScale ?? 1)
+function px(n: number): string { return `${n * hs.value}px` }
 
 const emit = defineEmits<{
   'element-change': [payload: { id: string, patch: Partial<SlideElement> }]
   'element-delete': [id: string]
 }>()
 
-type DraggableElement = DeviceElement | CaptionElement | IconElement
-const draggableElements = computed(() => props.elements.filter((e): e is DraggableElement => e.type === 'device' || e.type === 'caption' || e.type === 'icon'))
+type DraggableElement = DeviceElement | CaptionElement | IconElement | TextElement | ChipsElement
+const draggableElements = computed(() => props.elements.filter((e): e is DraggableElement => e.type === 'device' || e.type === 'caption' || e.type === 'icon' || e.type === 'text' || e.type === 'chips'))
 
 // Template ref to the overlay container — its rect IS the canvas's rendered
 // pixel size, which is what we need to convert screen-px drag deltas into
@@ -57,16 +65,22 @@ function deviceHeightPct(el: DeviceElement): number {
 }
 
 const CAPTION_HEIGHT_PCT = 14
+const CHIPS_HEIGHT_PCT = 14
 
 function widthPctOf(el: DraggableElement): number {
   if (el.type === 'device') return deviceWidthPct(el)
   if (el.type === 'caption') return el.widthPct ?? 80
+  if (el.type === 'text') return el.widthPct ?? 30
+  if (el.type === 'chips') return el.widthPct
   return el.sizePct // icon: sizePct already represents width as % of canvas
 }
 
 function heightPctOf(el: DraggableElement): number {
   if (el.type === 'device') return deviceHeightPct(el)
   if (el.type === 'caption') return CAPTION_HEIGHT_PCT
+  if (el.type === 'chips') return CHIPS_HEIGHT_PCT
+  // Text: approximate ~1.4 lines tall from the font size (% of cW) → % of cH.
+  if (el.type === 'text') return el.sizePct * 1.4 * props.cW / props.cH
   // Icon is rendered as a square in canvas px (sizePct% of cW for both axes),
   // so as a % of cH it's sizePct * cW / cH.
   return el.sizePct * props.cW / props.cH
@@ -81,6 +95,7 @@ const CAPTION_MAX_W = 100
 function clampWidth(el: DraggableElement, w: number): number {
   if (el.type === 'device') return Math.max(DEVICE_MIN_W, Math.min(DEVICE_MAX_W, w))
   if (el.type === 'caption') return Math.max(CAPTION_MIN_W, Math.min(CAPTION_MAX_W, w))
+  if (el.type === 'text' || el.type === 'chips') return Math.max(10, Math.min(100, w))
   return Math.max(5, Math.min(40, w)) // icon
 }
 
@@ -89,7 +104,7 @@ const CAPTION_HANDLES = ['w', 'e'] as const
 type HandleId = (typeof DEVICE_HANDLES)[number] | (typeof CAPTION_HANDLES)[number]
 
 function handlesFor(el: DraggableElement): readonly HandleId[] {
-  if (el.type === 'caption') return CAPTION_HANDLES
+  if (el.type === 'caption' || el.type === 'text' || el.type === 'chips') return CAPTION_HANDLES
   if (el.type === 'icon') return [] // move + delete only for now
   return DEVICE_HANDLES
 }
@@ -501,19 +516,19 @@ function hintLabel(el: DraggableElement): string {
            the top edge so it doesn't crowd the corner/edge resize handles.
            Hold Shift while dragging to snap to 15° increments. -->
       <div
-        v-if="el.type === 'device' || el.type === 'caption'"
+        v-if="el.type === 'device' || el.type === 'caption' || el.type === 'text'"
         :style="{
           position: 'absolute',
           left: '50%', top: '0',
-          width: '64px', height: '64px',
+          width: px(64), height: px(64),
           transform: 'translate(-50%, -200%)',
           background: drag?.id === el.id && drag.mode === 'rotate' ? '#1d4ed8' : '#2563eb',
-          border: '8px solid white',
+          border: `${px(8)} solid white`,
           borderRadius: '50%',
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
           cursor: 'grab',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'white', fontSize: '38px', fontWeight: '700',
+          color: 'white', fontSize: px(38), fontWeight: '700',
         }"
         class="opacity-0 group-hover/handle:opacity-100 transition-opacity"
         :class="drag?.id === el.id ? '!opacity-100' : ''"
@@ -533,15 +548,15 @@ function hintLabel(el: DraggableElement): string {
         :style="{
           position: 'absolute',
           top: '0', right: '0',
-          width: '56px', height: '56px',
+          width: px(56), height: px(56),
           transform: 'translate(50%, -50%)',
           background: '#dc2626',
-          border: '6px solid white',
+          border: `${px(6)} solid white`,
           borderRadius: '50%',
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
           cursor: 'pointer',
           color: 'white',
-          fontSize: '36px',
+          fontSize: px(36),
           fontWeight: '700',
           lineHeight: '1',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -558,11 +573,11 @@ function hintLabel(el: DraggableElement): string {
       <!-- Visual tether between rotate handle and element top, so the
            interaction is legible from a glance. -->
       <div
-        v-if="el.type === 'device' || el.type === 'caption'"
+        v-if="el.type === 'device' || el.type === 'caption' || el.type === 'text'"
         :style="{
           position: 'absolute',
           left: '50%', top: '0',
-          width: '4px', height: '128px',
+          width: px(4), height: px(128),
           transform: 'translate(-50%, -100%)',
           background: '#2563eb',
           opacity: '0.4',
@@ -576,10 +591,10 @@ function hintLabel(el: DraggableElement): string {
         :key="`${el.id}-${h}`"
         :style="{
           position: 'absolute',
-          width: '48px', height: '48px',
+          width: px(48), height: px(48),
           background: drag?.id === el.id && drag.mode === 'resize' && drag.handle === h
             ? '#1d4ed8' : '#2563eb',
-          border: '6px solid white',
+          border: `${px(6)} solid white`,
           borderRadius: '50%',
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
           cursor: HANDLE_CURSORS[h],
@@ -596,13 +611,13 @@ function hintLabel(el: DraggableElement): string {
       <div
         :style="{
           position: 'absolute',
-          left: '50%', top: '8px',
+          left: '50%', top: px(8),
           transform: 'translateX(-50%)',
-          padding: '20px 40px',
-          borderRadius: '24px',
+          padding: `${px(20)} ${px(40)}`,
+          borderRadius: px(24),
           background: '#2563eb',
           color: 'white',
-          fontSize: '52px',
+          fontSize: px(52),
           fontWeight: '700',
           lineHeight: '1',
           boxShadow: '0 20px 40px rgba(0,0,0,0.25)',

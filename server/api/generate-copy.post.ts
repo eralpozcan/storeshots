@@ -31,6 +31,7 @@ const DESIGN_SYSTEM_PROMPT = `You are an expert App Store designer, copywriter, 
 Return a JSON object with:
 1. "slides" — array of slide objects with label, headline, and imageIndex (reordered for best conversion)
 2. "colors" — brand color palette derived from the screenshots' UI
+3. "features" — 4-6 short feature chips (1-2 words each, e.g. "Budgeting", "Reports", "Offline") derived from the screenshots and app info, in priority order. These appear as the store feature-graphic chips.
 ${ORDERING_RULES}
 
 Rules for headlines:
@@ -50,7 +51,8 @@ Rules for colors:
 Respond ONLY with JSON, no markdown:
 {
   "slides": [{"label":"LABEL","headline":"Line one\\nLine two","imageIndex":0}, ...],
-  "colors": {"primary":"#hex","accent":"#hex","textDark":"#hex","textLight":"#hex","bgFrom":"#hex","bgTo":"#hex"}
+  "colors": {"primary":"#hex","accent":"#hex","textDark":"#hex","textLight":"#hex","bgFrom":"#hex","bgTo":"#hex"},
+  "features": ["Feature one","Feature two","Feature three","Feature four"]
 }`
 
 const LOCALE_NAMES: Record<string, string> = {
@@ -64,7 +66,7 @@ const LOCALE_NAMES: Record<string, string> = {
   vi: 'Vietnamese', th: 'Thai', hu: 'Hungarian',
 }
 
-function buildUserPrompt(appName: string, appDescription: string, features: string[], slideCount: number, locale: string, imageCount: number): string {
+function buildUserPrompt(appName: string, appDescription: string, aiBrief: string, features: string[], slideCount: number, locale: string, imageCount: number): string {
   const lang = LOCALE_NAMES[locale] || 'English'
 
   let imageNote: string
@@ -82,7 +84,7 @@ The app UI is in ${lang}. Analyze each screenshot carefully:
 
   return `App name: ${appName}
 Description: ${appDescription || 'A mobile app'}
-Top features (in priority order): ${features.join(', ') || 'core features'}
+Top features (in priority order): ${features.join(', ') || 'core features'}${aiBrief ? `\nAdditional brief / context (weight this heavily): ${aiBrief}` : ''}
 Number of slides: ${slideCount}
 Output language: ${lang} (ALL headlines and labels MUST be in ${lang})
 
@@ -94,7 +96,7 @@ Narrative arc:
 - Last slide: Trust / closing message ("Made for...", "Join...", etc.)`
 }
 
-function buildMultiLocalePrompt(appName: string, appDescription: string, features: string[], slideCount: number, locales: string[], imageCount: number): string {
+function buildMultiLocalePrompt(appName: string, appDescription: string, aiBrief: string, features: string[], slideCount: number, locales: string[], imageCount: number): string {
   const langList = locales.map((l, i) => `${i + 1}. ${LOCALE_NAMES[l] || l} (${l})`).join('\n')
 
   let imageNote: string
@@ -106,7 +108,7 @@ function buildMultiLocalePrompt(appName: string, appDescription: string, feature
 
   return `App name: ${appName}
 Description: ${appDescription || 'A mobile app'}
-Top features (in priority order): ${features.join(', ') || 'core features'}
+Top features (in priority order): ${features.join(', ') || 'core features'}${aiBrief ? `\nAdditional brief / context (weight this heavily): ${aiBrief}` : ''}
 Number of slides: ${slideCount}
 
 ${imageNote}
@@ -218,6 +220,7 @@ export default defineEventHandler(async (event) => {
   const claudeModel = ensureString(body.claudeModel, 'claudeModel', 64, false) || 'claude-sonnet-4-6'
   const appName = ensureString(body.appName, 'appName', 200, false)
   const appDescription = ensureString(body.appDescription, 'appDescription', 4000, false)
+  const aiBrief = ensureString(body.aiBrief, 'aiBrief', 2000, false)
   const locale = ensureString(body.locale ?? 'en', 'locale', 8, false)
 
   // Multi-locale: optional array of locale codes for single-call multi-language generation
@@ -270,7 +273,7 @@ export default defineEventHandler(async (event) => {
   const systemPrompt = mode === 'full-design' ? DESIGN_SYSTEM_PROMPT : COPY_SYSTEM_PROMPT
 
   async function callWithImages(imgs: string[], overridePrompt?: string): Promise<string> {
-    const userPrompt = overridePrompt ?? buildUserPrompt(appName, appDescription, features, slideCount, locale, imgs.length)
+    const userPrompt = overridePrompt ?? buildUserPrompt(appName, appDescription, aiBrief, features, slideCount, locale, imgs.length)
     const msgPayload = buildMessages(systemPrompt, userPrompt, imgs, provider)
 
     if (provider === 'claude') {
@@ -322,7 +325,7 @@ export default defineEventHandler(async (event) => {
   try {
     // Multi-locale: single call, all languages at once
     if (multiLocales) {
-      const prompt = buildMultiLocalePrompt(appName, appDescription, features, slideCount, multiLocales, images.length)
+      const prompt = buildMultiLocalePrompt(appName, appDescription, aiBrief, features, slideCount, multiLocales, images.length)
       const responseText = await runCall(images, prompt)
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw createError({ statusCode: 502, statusMessage: 'Could not parse multi-locale AI response' })
@@ -336,7 +339,11 @@ export default defineEventHandler(async (event) => {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw createError({ statusCode: 502, statusMessage: 'Could not parse AI response' })
       const parsed = parseLooseJson(jsonMatch[0])
-      return { slides: parsed.slides || [], colors: parsed.colors || null }
+      return {
+        slides: parsed.slides || [],
+        colors: parsed.colors || null,
+        features: Array.isArray(parsed.features) ? parsed.features : null,
+      }
     }
 
     const jsonMatch = responseText.match(/\[[\s\S]*\]/)

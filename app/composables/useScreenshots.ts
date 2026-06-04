@@ -173,8 +173,18 @@ export function useScreenshots() {
     return reordered
   }
 
-  function applyAIResult(res: { slides?: any[]; colors?: any }) {
+  function applyAIResult(res: { slides?: any[]; colors?: any; features?: any[] }) {
     const patch: Partial<UserConfig> = {}
+
+    // AI-suggested feature chips (full-design mode). Sanitize + cap; the user
+    // can revise them in the sidebar / feature-graphic editor afterwards.
+    if (Array.isArray(res.features) && res.features.length) {
+      const clean = res.features
+        .filter((f: any) => typeof f === 'string' && f.trim())
+        .map((f: string) => f.trim())
+        .slice(0, 12)
+      if (clean.length) patch.features = clean
+    }
 
     if (res.slides) {
       // Extract copy (without imageIndex)
@@ -247,6 +257,7 @@ export function useScreenshots() {
           claudeModel: config.value.ai.claudeModel,
           appName: config.value.appName,
           appDescription: config.value.appDescription,
+          aiBrief: config.value.aiBrief,
           features: config.value.features,
           slideCount: 10,
           locale: config.value.locale || 'en',
@@ -284,6 +295,7 @@ export function useScreenshots() {
           claudeModel: config.value.ai.claudeModel,
           appName: config.value.appName,
           appDescription: config.value.appDescription,
+          aiBrief: config.value.aiBrief,
           features: config.value.features,
           slideCount: 10,
           locale: config.value.locale || 'en',
@@ -337,6 +349,7 @@ export function useScreenshots() {
         claudeModel: config.value.ai.claudeModel,
         appName: config.value.appName,
         appDescription: config.value.appDescription,
+        aiBrief: config.value.aiBrief,
         features: config.value.features,
         slideCount: config.value.copy.length,
         mode: 'copy-only' as const,
@@ -549,6 +562,9 @@ export function useScreenshots() {
         copyByLocale: (incoming.copyByLocale && typeof incoming.copyByLocale === 'object') ? incoming.copyByLocale : {},
         features: Array.isArray(incoming.features) ? incoming.features : DEFAULT_CONFIG.features,
         locale: typeof incoming.locale === 'string' ? incoming.locale : DEFAULT_CONFIG.locale,
+        fgElements: Array.isArray(incoming.fgElements) && incoming.fgElements.length
+          ? incoming.fgElements
+          : DEFAULT_CONFIG.fgElements,
       }
       saveConfig(config.value)
       toast.add({

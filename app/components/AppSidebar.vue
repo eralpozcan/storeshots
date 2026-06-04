@@ -451,6 +451,29 @@ function handleReset() {
         />
       </div>
 
+      <!-- AI brief (extra context) -->
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-xs font-semibold text-gray-700">
+            AI brief <span class="font-normal text-gray-400">· optional</span>
+          </label>
+          <span class="text-[10px] text-gray-400">{{ config.aiBrief.length }} / 2000</span>
+        </div>
+        <UTextarea
+          :model-value="config.aiBrief"
+          :rows="3"
+          size="sm"
+          placeholder="Steer the AI: target audience, tone, key differentiators, keywords to emphasise…"
+          maxlength="2000"
+          class="w-full"
+          :ui="{ base: 'w-full' }"
+          @update:model-value="emit('change', { aiBrief: $event as string })"
+        />
+        <p class="text-[10px] text-gray-400 mt-1 leading-relaxed">
+          Fed to ✦ Headlines / ✦ Full design alongside the name, description, and screenshots.
+        </p>
+      </div>
+
       <!-- Features (chip input) -->
       <div>
         <div class="flex items-center justify-between mb-1">

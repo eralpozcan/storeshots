@@ -281,3 +281,25 @@ export const VARIANT_PRESETS: Record<number, SlideElement[]> = {
   1: variant1, 2: variant2, 3: variant3, 4: variant4, 5: variant5,
   6: variant6, 7: variant7, 8: variant8, 9: variant9,
 }
+
+// Default Feature Graphic (1024×500) layout, expressed as elements so the
+// banner is editable with the same drag/resize model as slides. Coordinates
+// are % of the FG canvas; text sizePct is % of FGW (e.g. 1.37% ≈ 14px). The
+// app name + first headline bind to config so they track the rest of the
+// project; the user can still move, resize, retext, or delete each piece.
+export const FG_PRESET: SlideElement[] = [
+  { id: 'fg-icon', type: 'icon', x: 5.5, y: 50, anchor: 'cl', sizePct: 8.6, zIndex: 5 },
+  {
+    id: 'fg-eyebrow', type: 'text', bind: 'appName',
+    x: 16.5, y: 41, anchor: 'tl',
+    sizePct: 1.37, weight: 600, color: 'accent', uppercase: true, letterSpacing: 0.14,
+    zIndex: 5,
+  },
+  {
+    id: 'fg-headline', type: 'text', bind: 'headline',
+    x: 16.5, y: 46, anchor: 'tl',
+    sizePct: 3.13, weight: 700, color: 'textLight', widthPct: 36,
+    zIndex: 5,
+  },
+  { id: 'fg-chips', type: 'chips', x: 60, y: 50, anchor: 'cl', widthPct: 36, zIndex: 5 },
+]

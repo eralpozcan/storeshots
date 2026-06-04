@@ -6,7 +6,23 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **The Feature Graphic is now fully editable**. The 1024×500 Play Store banner
+  was a fixed layout; now every piece — app icon, text, and the feature chips —
+  can be dragged, resized, and rotated on the canvas. Add or remove text, chip,
+  and icon elements, edit text and chip content from the side panel, and reset
+  to the default with one click. Custom layouts ride along in the project file.
+- **AI brief field**. An optional free-text box (under Description) steers copy
+  generation — audience, tone, keywords, differentiators — on top of the app
+  name, description, and screenshots. It is sent to ✦ Headlines, ✦ Full design,
+  and multi-language generation.
+- **AI now suggests feature chips**. ✦ Full design returns a prioritised feature
+  list that fills the feature-graphic chips and the Key features field, ready to
+  revise.
+
 ### Changed
+- **Start templates seed the AI brief** with an audience/tone hint for their
+  vertical (SaaS, Game, Finance, Health), so AI generation starts on-target.
 - **Android listings now use all 10 slides** (was 8), matching the App Store, so
   the last two screenshots are no longer dropped and there's more room for
   alternative layouts.

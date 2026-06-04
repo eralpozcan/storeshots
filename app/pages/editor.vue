@@ -2,9 +2,9 @@
 import type { ComponentPublicInstance } from 'vue'
 import { toPng, getFontEmbedCSS } from 'html-to-image'
 import JSZip from 'jszip'
-import type { Device, Orientation, SlideElement } from '~/utils/types'
+import type { Device, Orientation, SlideElement, TextElement } from '~/utils/types'
 import {
-  FGW, FGH, STORE_PRESETS,
+  FGW, FGH, STORE_PRESETS, FG_PRESET,
   IPHONE_SIZES, IPAD_SIZES, ANDROID_SIZES, ANDROID_7P_SIZES, ANDROID_10P_SIZES,
 } from '~/utils/canvas'
 import type { StorePreset } from '~/utils/canvas'
@@ -95,6 +95,7 @@ function applyTemplate(t: StartTemplate) {
     colors: t.colors,
     copy: t.copy,
     features: t.features,
+    aiBrief: t.aiBrief,
   })
   templatePickerOpen.value = false
   templatesDismissed.value = true
@@ -187,6 +188,80 @@ function resolveVariant(i: number): number {
 function onElementChange(slideIdx: number, payload: { id: string, patch: Partial<SlideElement> }) {
   const variant = resolveVariant(slideIdx)
   patchElement(slideIdx, variant, payload.id, payload.patch)
+}
+
+// ─── Feature Graphic editing ───
+// The FG is a single canvas (no slide index), so it has its own element store
+// (config.fgElements) and a lightweight set of write helpers mirroring the
+// slide element flow. The SlideTransformOverlay is reused as-is for drag/resize.
+const fgEditMode = ref(false)
+const fgTextElements = computed(() => config.value.fgElements.filter((e): e is TextElement => e.type === 'text'))
+
+// Render the FG at native FGW×FGH px and scale the wrapper down (same pattern
+// as SlideCard) so the shared transform overlay's fixed-px handles scale with
+// the canvas instead of rendering enormous on the 1024px banner.
+const fgWrapEl = ref<HTMLElement | null>(null)
+const fgScale = ref(0.5)
+let fgRo: ResizeObserver | null = null
+watch(fgWrapEl, (el) => {
+  fgRo?.disconnect()
+  if (el) {
+    fgRo = new ResizeObserver(([e]) => { if (e) fgScale.value = e.contentRect.width / FGW })
+    fgRo.observe(el)
+  }
+})
+onBeforeUnmount(() => fgRo?.disconnect())
+
+function writeFg(next: SlideElement[]) { updateConfig({ fgElements: next }) }
+function onFgElementChange(payload: { id: string, patch: Partial<SlideElement> }) {
+  writeFg(config.value.fgElements.map(e => e.id === payload.id ? { ...e, ...payload.patch } as SlideElement : e))
+}
+function onFgElementDelete(id: string) { writeFg(config.value.fgElements.filter(e => e.id !== id)) }
+function addFgText() {
+  writeFg([...config.value.fgElements, {
+    id: uid('text'), type: 'text', text: 'New text',
+    x: 50, y: 50, anchor: 'c', sizePct: 2.4, weight: 700, color: 'textLight', zIndex: 7,
+  }])
+}
+// Toggle the single chips group on/off (there's only ever one feature-chip
+// block, so the toolbar button flips it instead of stacking duplicates).
+function toggleFgChips() {
+  if (config.value.fgElements.some(e => e.type === 'chips')) {
+    writeFg(config.value.fgElements.filter(e => e.type !== 'chips'))
+  } else {
+    writeFg([...config.value.fgElements, {
+      id: uid('chips'), type: 'chips', x: 60, y: 50, anchor: 'cl', widthPct: 36, zIndex: 7,
+    }])
+  }
+}
+function addFgIcon() {
+  writeFg([...config.value.fgElements, {
+    id: uid('icon'), type: 'icon', x: 50, y: 50, anchor: 'c', sizePct: 12, zIndex: 7,
+  }])
+}
+function resetFg() { writeFg([...FG_PRESET]) }
+function fgTextValue(t: TextElement): string {
+  if (t.bind === 'appName') return config.value.appName
+  if (t.bind === 'headline') return (config.value.copy[0]?.headline ?? '').replace(/\n/g, ' ')
+  return t.text ?? ''
+}
+function unbindFgText(t: TextElement) {
+  onFgElementChange({ id: t.id, patch: { bind: undefined, text: fgTextValue(t) } })
+}
+
+// Chips render config.features, so the FG panel edits the feature list directly
+// (same data the sidebar's feature editor uses).
+const fgHasChips = computed(() => config.value.fgElements.some(e => e.type === 'chips'))
+function updateFgFeature(i: number, val: string) {
+  const next = [...config.value.features]
+  next[i] = val
+  updateConfig({ features: next })
+}
+function removeFgFeature(i: number) {
+  updateConfig({ features: config.value.features.filter((_, idx) => idx !== i) })
+}
+function addFgFeature() {
+  updateConfig({ features: [...config.value.features, 'New feature'] })
 }
 
 // Layout picker for the focused header — exposes all 10 variants with a
@@ -958,28 +1033,153 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           v-if="device === 'feature-graphic'"
           class="p-6"
         >
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
             <p class="text-xs text-gray-500">
               Google Play Feature Graphic · 1024×500
             </p>
-            <UButton
-              size="sm"
-              icon="i-lucide-download"
-              :loading="!!exporting"
-              :disabled="!!exporting"
-              @click="exportFG"
-            >
-              Download
-            </UButton>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <template v-if="fgEditMode">
+                <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-type" @click="addFgText">Text</UButton>
+                <UButton size="xs" :color="fgHasChips ? 'primary' : 'neutral'" :variant="fgHasChips ? 'solid' : 'soft'" icon="i-lucide-tags" @click="toggleFgChips">Chips</UButton>
+                <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-image" @click="addFgIcon">Icon</UButton>
+                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-rotate-ccw" @click="resetFg">Reset</UButton>
+              </template>
+              <UButton
+                size="sm"
+                :color="fgEditMode ? 'primary' : 'neutral'"
+                :variant="fgEditMode ? 'solid' : 'soft'"
+                :icon="fgEditMode ? 'i-lucide-check' : 'i-lucide-pencil'"
+                @click="fgEditMode = !fgEditMode"
+              >
+                {{ fgEditMode ? 'Done' : 'Edit' }}
+              </UButton>
+              <UButton
+                size="sm"
+                icon="i-lucide-download"
+                :loading="!!exporting"
+                :disabled="!!exporting"
+                @click="exportFG"
+              >
+                Download
+              </UButton>
+            </div>
           </div>
-          <div class="inline-block rounded-xl overflow-hidden shadow-lg">
-            <FeatureGraphic :cfg="slideConfig" />
+          <div class="flex gap-6 items-start">
+          <div
+            ref="fgWrapEl"
+            class="relative"
+            :style="{ flex: '1 1 0%', maxWidth: `${FGW}px`, aspectRatio: `${FGW}/${FGH}` }"
+          >
+            <div :style="{ width: `${FGW}px`, height: `${FGH}px`, transform: `scale(${fgScale})`, transformOrigin: 'top left' }">
+              <div
+                class="rounded-xl overflow-hidden shadow-lg"
+                :style="{ width: `${FGW}px`, height: `${FGH}px` }"
+              >
+                <FeatureGraphic :cfg="slideConfig" :elements="config.fgElements" />
+              </div>
+              <SlideTransformOverlay
+                v-if="fgEditMode"
+                :elements="config.fgElements"
+                :c-w="FGW"
+                :c-h="FGH"
+                device-frame="iphone"
+                :handle-scale="0.24 / fgScale"
+                @element-change="onFgElementChange"
+                @element-delete="onFgElementDelete"
+              />
+            </div>
+          </div>
+          <div
+            v-if="fgEditMode"
+            class="w-80 shrink-0 space-y-4"
+          >
+            <!-- Text elements -->
+            <div class="space-y-2">
+              <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Text content</p>
+              <div
+                v-for="t in fgTextElements"
+                :key="t.id"
+                class="flex items-center gap-2"
+              >
+                <UInput
+                  :model-value="fgTextValue(t)"
+                  :disabled="!!t.bind"
+                  size="xs"
+                  class="flex-1"
+                  placeholder="Text"
+                  @update:model-value="onFgElementChange({ id: t.id, patch: { text: $event as string } })"
+                />
+                <UButton
+                  v-if="t.bind"
+                  size="xs"
+                  color="neutral"
+                  variant="soft"
+                  :title="`Synced from ${t.bind === 'appName' ? 'app name' : 'headline'} — unlink to edit freely`"
+                  @click="unbindFgText(t)"
+                >
+                  Unlink
+                </UButton>
+                <span
+                  v-else
+                  class="text-[10px] text-gray-400 shrink-0 w-12"
+                >custom</span>
+              </div>
+            </div>
+
+            <!-- Chips = feature list -->
+            <div
+              v-if="fgHasChips"
+              class="space-y-2"
+            >
+              <div class="flex items-center justify-between">
+                <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Chips (features)</p>
+                <button
+                  type="button"
+                  class="text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer flex items-center gap-1"
+                  @click="addFgFeature"
+                >
+                  <UIcon
+                    name="i-lucide-plus"
+                    class="size-3.5"
+                  />
+                  Add
+                </button>
+              </div>
+              <div
+                v-for="(f, i) in config.features"
+                :key="i"
+                class="flex items-center gap-2"
+              >
+                <UInput
+                  :model-value="f"
+                  size="xs"
+                  class="flex-1"
+                  placeholder="Feature"
+                  @update:model-value="updateFgFeature(i, $event as string)"
+                />
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-x"
+                  title="Remove chip"
+                  @click="removeFgFeature(i)"
+                />
+              </div>
+              <p
+                v-if="!config.features.length"
+                class="text-xs text-gray-400"
+              >
+                No features yet — add one to show chips.
+              </p>
+            </div>
+          </div>
           </div>
           <div
             ref="fgRef"
             :style="{ position: 'absolute', left: '-9999px', top: 0, width: `${FGW}px`, height: `${FGH}px` }"
           >
-            <FeatureGraphic :cfg="slideConfig" />
+            <FeatureGraphic :cfg="slideConfig" :elements="config.fgElements" />
           </div>
         </div>
 

@@ -78,7 +78,31 @@ export type IconElement = BaseElement & {
   sizePct: number
 }
 
-export type SlideElement = DeviceElement | CaptionElement | BlobElement | IconElement
+// Free-form text element (used by the Feature Graphic). Content is either the
+// literal `text`, or — when `bind` is set — pulled live from the config so the
+// app name / headline stay in sync with the rest of the project.
+export type TextElement = BaseElement & {
+  type: 'text'
+  text?: string
+  bind?: 'appName' | 'headline'
+  sizePct: number   // font size as % of canvas width
+  weight: number    // 400 / 600 / 700
+  color: 'primary' | 'accent' | 'textDark' | 'textLight'
+  uppercase?: boolean
+  letterSpacing?: number // em
+  widthPct?: number      // wrap width as % of canvas; absent = no wrap
+  align?: 'left' | 'center' | 'right'
+}
+
+// Feature-chip group (Feature Graphic). Renders cfg.features as pills; the
+// element controls position and wrap width, content stays driven by features.
+export type ChipsElement = BaseElement & {
+  type: 'chips'
+  widthPct: number // max wrap width as % of canvas
+}
+
+export type SlideElement =
+  | DeviceElement | CaptionElement | BlobElement | IconElement | TextElement | ChipsElement
 
 export type BrandColors = {
   primary: string
@@ -102,12 +126,17 @@ export type CustomFont = {
 export type UserConfig = {
   appName: string
   appDescription: string
+  // Free-form extra context/brief fed to the AI (audience, tone, keywords,
+  // differentiators) on top of name + description + features.
+  aiBrief: string
   features: string[]
   appIcon: string | null
   colors: BrandColors
   // Active typeface token: a BUILTIN_FONTS family or CUSTOM_FONT_VALUE.
   fontFamily: string
   customFont: CustomFont | null
+  // Feature Graphic element layout (icon / text / chips). Absent → FG_PRESET.
+  fgElements: SlideElement[]
   copy: SlideCopy[]
   // Per-locale copy store. `copy` always mirrors the active locale
   // (`locale`); copyByLocale holds the saved copy for every generated /

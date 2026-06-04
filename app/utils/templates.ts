@@ -13,6 +13,9 @@ export type StartTemplate = {
   colors: BrandColors
   copy: SlideCopy[]
   features: string[]
+  // Seed for the AI brief — pre-steers ✦ Headlines / ✦ Full design toward the
+  // vertical's audience and tone. The user can refine it.
+  aiBrief: string
 }
 
 const slide = (label: string, headline: string): SlideCopy => ({ label, headline })
@@ -32,6 +35,7 @@ export const START_TEMPLATES: StartTemplate[] = [
       bgTo: '#1e3a8a',
     },
     features: ['Saves hours every week', 'Works on every device', 'Built for teams'],
+    aiBrief: 'Audience: busy professionals and teams. Tone: calm, confident, efficiency-focused. Emphasise time saved, automation, and reliability. Avoid hype and buzzwords.',
     copy: [
       slide('HERO', 'Get back\nyour week.'),
       slide('FOCUS', 'Cut the busywork.\nKeep the work.'),
@@ -59,6 +63,7 @@ export const START_TEMPLATES: StartTemplate[] = [
       bgTo: '#5b0066',
     },
     features: ['100+ unique levels', 'Compete with friends', 'Offline mode'],
+    aiBrief: 'Audience: casual mobile gamers. Tone: high-energy, playful, punchy. Emphasise fun, competition, and replayability. Keep phrasing short and exciting.',
     copy: [
       slide('HERO', 'One more\nlevel. Promise.'),
       slide('PLAY', 'Pick up.\nLose hours.'),
@@ -86,6 +91,7 @@ export const START_TEMPLATES: StartTemplate[] = [
       bgTo: '#064e3b',
     },
     features: ['Bank-grade encryption', 'Track every dollar', 'No hidden fees'],
+    aiBrief: 'Audience: everyday, money-conscious users. Tone: trustworthy, clear, reassuring. Emphasise security, transparency, and no hidden fees. Avoid financial jargon.',
     copy: [
       slide('HERO', 'Money made\nclear.'),
       slide('SAVE', 'Save without\nthinking.'),
@@ -113,6 +119,7 @@ export const START_TEMPLATES: StartTemplate[] = [
       bgTo: '#166534',
     },
     features: ['Gentle reminders', 'Track real progress', 'No guilt, ever'],
+    aiBrief: 'Audience: people building healthier habits. Tone: warm, encouraging, judgment-free. Emphasise small steps, steady progress, and consistency. Keep it calm and supportive.',
     copy: [
       slide('HERO', 'Small steps,\nbig wins.'),
       slide('DAILY', 'Five minutes\na day.'),

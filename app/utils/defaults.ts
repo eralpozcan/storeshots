@@ -1,5 +1,6 @@
 import type { UserConfig } from './types'
 import { DEFAULT_FONT_FAMILY } from './fonts'
+import { FG_PRESET } from './canvas'
 
 export const SLIDE_COUNT = 10
 export const SLIDE_COUNT_APPLE = 10
@@ -13,6 +14,7 @@ export const PLACEHOLDER_IMG =
 export const DEFAULT_CONFIG: UserConfig = {
   appName: 'My App',
   appDescription: '',
+  aiBrief: '',
   features: [],
   appIcon: null,
   colors: {
@@ -25,6 +27,7 @@ export const DEFAULT_CONFIG: UserConfig = {
   },
   fontFamily: DEFAULT_FONT_FAMILY,
   customFont: null,
+  fgElements: FG_PRESET,
   copy: Array.from({ length: SLIDE_COUNT }, (_, i) => ({
     label: i === SLIDE_COUNT - 1 ? 'TRUST' : `FEATURE ${i + 1}`,
     headline: i === SLIDE_COUNT - 1 ? 'Built for\nyou.' : 'Your headline\nhere.',
@@ -79,6 +82,9 @@ export function loadConfig(): UserConfig {
         ? parsed.selectedLocales
         : [parsed.locale ?? DEFAULT_CONFIG.locale],
       batchLocaleGenerate: parsed.batchLocaleGenerate ?? DEFAULT_CONFIG.batchLocaleGenerate,
+      fgElements: Array.isArray(parsed.fgElements) && parsed.fgElements.length
+        ? parsed.fgElements
+        : DEFAULT_CONFIG.fgElements,
     }
   } catch {
     return DEFAULT_CONFIG
