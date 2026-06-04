@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MK_W, MK_H, SC_L, SC_T, SC_W, SC_H, SC_RX, SC_RY, TAB_P_RATIO, TAB_L_RATIO } from '~/utils/canvas'
+import { MK_W, MK_H, SC_L, SC_T, SC_W, SC_H, SC_RX, SC_RY, TAB_P_RATIO, TAB_L_RATIO, ANDROID_RATIO } from '~/utils/canvas'
 
 defineProps<{
   type: 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad'
@@ -26,17 +26,13 @@ const { mockupUrl } = useMockup()
   <!-- Android Phone -->
   <div
     v-else-if="type === 'android-phone'"
-    :style="{ position: 'absolute', aspectRatio: `${MK_W}/${MK_H}`, ...style }"
+    :style="{ position: 'absolute', aspectRatio: `${ANDROID_RATIO}`, ...style }"
   >
     <div :style="{ width: '100%', height: '100%', position: 'relative', borderRadius: '6.5% / 3%', background: 'linear-gradient(160deg,#323236 0%,#1c1c20 100%)', boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.12), 0 12px 48px rgba(0,0,0,0.55)', overflow: 'hidden' }">
       <div :style="{ position: 'absolute', left: '-1.2%', top: '20%', width: '1.5%', height: '7%', background: '#2a2a2e', borderRadius: '2px 0 0 2px' }" />
       <div :style="{ position: 'absolute', left: '-1.2%', top: '30%', width: '1.5%', height: '10%', background: '#2a2a2e', borderRadius: '2px 0 0 2px' }" />
       <div :style="{ position: 'absolute', left: '-1.2%', top: '42%', width: '1.5%', height: '10%', background: '#2a2a2e', borderRadius: '2px 0 0 2px' }" />
       <div :style="{ position: 'absolute', right: '-1.2%', top: '28%', width: '1.5%', height: '8%', background: '#2a2a2e', borderRadius: '0 2px 2px 0' }" />
-      <div :style="{ position: 'absolute', top: '1.8%', left: '50%', transform: 'translateX(-50%)', width: '20%', height: '2.4%', borderRadius: '50px', background: '#111', border: '1px solid rgba(255,255,255,0.07)', zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }">
-        <div :style="{ width: '25%', height: '50%', borderRadius: '50%', background: '#222' }" />
-        <div :style="{ width: '18%', height: '40%', borderRadius: '50%', background: '#1a1a1a' }" />
-      </div>
       <div :style="{ position: 'absolute', inset: '0', borderRadius: '6.5% / 3%', border: '1px solid rgba(255,255,255,0.07)', pointerEvents: 'none', zIndex: 15 }" />
       <div :style="{ position: 'absolute', left: '3.5%', top: '1.5%', width: '93%', height: '97%', borderRadius: '4.5% / 2.2%', overflow: 'hidden', background: '#000' }">
         <img :src="src" :alt="alt" :style="{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }" draggable="false">

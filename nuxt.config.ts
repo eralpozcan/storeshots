@@ -29,8 +29,17 @@ export default defineNuxtConfig({
     { path: '~/components', pathPrefix: false },
   ],
   fonts: {
+    // Curated free typefaces — keep in sync with BUILTIN_FONTS in app/utils/fonts.ts.
+    // Self-hosted by @nuxt/fonts so their @font-face rules embed into PNG exports.
     families: [
       { name: 'Inter', provider: 'google', weights: [400, 600, 700], preload: true, display: 'swap' },
+      { name: 'Poppins', provider: 'google', weights: [400, 600, 700], display: 'swap' },
+      { name: 'Montserrat', provider: 'google', weights: [400, 600, 700], display: 'swap' },
+      { name: 'DM Sans', provider: 'google', weights: [400, 600, 700], display: 'swap' },
+      { name: 'Space Grotesk', provider: 'google', weights: [400, 600, 700], display: 'swap' },
+      { name: 'Roboto', provider: 'google', weights: [400, 600, 700], display: 'swap' },
+      { name: 'Playfair Display', provider: 'google', weights: [400, 600, 700], display: 'swap' },
+      { name: 'Lora', provider: 'google', weights: [400, 600, 700], display: 'swap' },
     ],
   },
   site: {
@@ -147,7 +156,7 @@ export default defineNuxtConfig({
         // be removed once we audit and prove no `eval`/`new Function` remains.
         'script-src': ["'self'", "'nonce-{{nonce}}'", "'strict-dynamic'", "'unsafe-eval'", 'https://cloud.umami.is'],
         'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        'font-src': ["'self'", 'https://fonts.gstatic.com'],
+        'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
         'connect-src': ["'self'", 'https://fonts.googleapis.com', 'https://fonts.gstatic.com', 'https://cloud.umami.is', 'https://api-gateway.umami.dev'],
         'worker-src': ["'self'", 'blob:'],
       },

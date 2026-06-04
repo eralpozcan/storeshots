@@ -91,12 +91,23 @@ export type BrandColors = {
 
 export type DeviceImages = (string | null)[]
 
+// Uploaded custom font. dataUrl is a base64 font data-URL; format is the CSS
+// `format()` hint (woff2/woff/opentype/truetype).
+export type CustomFont = {
+  name: string
+  dataUrl: string
+  format: string
+}
+
 export type UserConfig = {
   appName: string
   appDescription: string
   features: string[]
   appIcon: string | null
   colors: BrandColors
+  // Active typeface token: a BUILTIN_FONTS family or CUSTOM_FONT_VALUE.
+  fontFamily: string
+  customFont: CustomFont | null
   copy: SlideCopy[]
   // Per-locale copy store. `copy` always mirrors the active locale
   // (`locale`); copyByLocale holds the saved copy for every generated /
@@ -141,4 +152,6 @@ export type SlideConfig = {
   appIcon: string | null
   appName: string
   features: string[]
+  // Resolved CSS font-family stack for all slide text.
+  fontFamily: string
 }

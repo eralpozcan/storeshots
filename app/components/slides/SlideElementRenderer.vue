@@ -99,6 +99,7 @@ const deviceFilter = computed(() => {
       :text-color="textColor"
       :label-color="cfg.colors.accent"
       :c-w="cW"
+      :font-family="cfg.fontFamily"
     />
   </div>
 

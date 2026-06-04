@@ -92,7 +92,7 @@ const blob2Opacity = computed(() => isDark.value ? 0.10 : 0.07 + (props.variant 
     :style="{
       width: '100%', height: '100%', position: 'relative', overflow: 'hidden',
       background: `linear-gradient(160deg,${c.bgFrom} 0%,${c.bgTo} 100%)`,
-      fontFamily: 'Inter,sans-serif', display: 'flex', flexDirection: 'column',
+      fontFamily: cfg.fontFamily, display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center'
     }"
   >
@@ -110,7 +110,7 @@ const blob2Opacity = computed(() => isDark.value ? 0.10 : 0.07 + (props.variant 
       draggable="false"
     >
     <div :style="{ textAlign: 'center', position: 'relative', zIndex: 5, padding: `0 ${cW * 0.1}px`, transform: captionTranslate }">
-      <SlideCaption :label="copy.label" :headline="copy.headline" :text-color="c.textLight" :label-color="c.accent" :c-w="cW" />
+      <SlideCaption :label="copy.label" :headline="copy.headline" :text-color="c.textLight" :label-color="c.accent" :c-w="cW" :font-family="cfg.fontFamily" />
     </div>
     <div :style="{ position: 'absolute', bottom: '8%', left: '50%', transform: 'translateX(-50%)', width: `${cW * 0.14}px`, height: '3px', background: `linear-gradient(90deg,${c.primary},${c.accent})`, borderRadius: '2px', zIndex: 5 }" />
   </div>
@@ -120,7 +120,7 @@ const blob2Opacity = computed(() => isDark.value ? 0.10 : 0.07 + (props.variant 
     v-else
     :style="{
       width: '100%', height: '100%', position: 'relative', overflow: 'hidden',
-      background: bg, fontFamily: 'Inter,sans-serif'
+      background: bg, fontFamily: cfg.fontFamily
     }"
   >
     <!-- Decorative blobs (slide-level, not user-controllable in 2a) -->

@@ -24,6 +24,10 @@ export const SC_RY = (126  / 1990) * 100
 export const TAB_P_RATIO = 0.667
 export const TAB_L_RATIO = 1.5
 export const IPAD_RATIO  = 0.770
+// Modern Android phone body ratio. Chosen so the 93%×97% screen inset yields a
+// ~9:20 screen (1080×2400), matching current Pixel/Galaxy captures instead of
+// the iPhone mockup ratio it previously borrowed.
+export const ANDROID_RATIO = 0.47
 
 // Export sizes
 export const IPHONE_SIZES = [
@@ -92,6 +96,8 @@ export const STORE_PRESETS: StorePreset[] = [
 // Width formulas
 export function phoneW(cW: number, cH: number, clamp = 0.84)  { return Math.min(clamp, 0.72 * (cH / cW) * MK_RATIO) }
 export function phoneW2(cW: number, cH: number)                { return phoneW(cW, cH, 0.66) }
+export function androidW(cW: number, cH: number, clamp = 0.84) { return Math.min(clamp, 0.72 * (cH / cW) * ANDROID_RATIO) }
+export function androidW2(cW: number, cH: number)              { return androidW(cW, cH, 0.66) }
 export function tabletPW(cW: number, cH: number, clamp = 0.80) { return Math.min(clamp, 0.72 * (cH / cW) * TAB_P_RATIO) }
 export function tabletPW2(cW: number, cH: number)              { return tabletPW(cW, cH, 0.64) }
 export function tabletLW(cW: number, cH: number, clamp = 0.62) { return Math.min(clamp, 0.75 * (cH / cW) * TAB_L_RATIO) }
@@ -102,16 +108,15 @@ export type DeviceFrame = 'iphone' | 'android-phone' | 'android-tablet-p' | 'and
 
 // Width-formula map per device frame. Used by SlideElement to resolve a
 // device element's widthRole ('primary'/'secondary') into a % of canvas.
-// 'android-phone' shares the iPhone formulas because the canvas dims for the
-// android device match the iPhone aspect ratio and the existing variants
-// rendered identically with phoneW/phoneW2 for both.
+// 'android-phone' uses its own androidW/androidW2 (ANDROID_RATIO ~9:20) so the
+// drawn phone matches modern Pixel/Galaxy proportions, not the iPhone mockup.
 export const DEVICE_WIDTH_FNS: Record<DeviceFrame, {
   primary: (cW: number, cH: number) => number
   secondary: (cW: number, cH: number) => number
   ratio: number
 }> = {
   'iphone':           { primary: phoneW,   secondary: phoneW2,  ratio: MK_RATIO },
-  'android-phone':    { primary: phoneW,   secondary: phoneW2,  ratio: MK_RATIO },
+  'android-phone':    { primary: androidW, secondary: androidW2, ratio: ANDROID_RATIO },
   'android-tablet-p': { primary: tabletPW, secondary: tabletPW2, ratio: TAB_P_RATIO },
   'android-tablet-l': { primary: tabletLW, secondary: tabletLW,  ratio: TAB_L_RATIO },
   'ipad':             { primary: ipadW,    secondary: ipadW2,    ratio: IPAD_RATIO },

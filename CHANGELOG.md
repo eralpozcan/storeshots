@@ -6,12 +6,31 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-06-04
+
+### Added
+- **Typeface picker with custom font upload**. Brand style now has a Typeface
+  section with eight built-in fonts — Inter, Poppins, Montserrat, DM Sans,
+  Space Grotesk, Roboto, Playfair Display, Lora — each previewed in its own
+  typeface, plus an Upload button for your own `.ttf`/`.otf`/`.woff`/`.woff2`
+  (max 2 MB, extension + size validated). The chosen font applies to every
+  slide's text and is embedded into PNG exports; a custom font is saved with the
+  project and travels inside the exported `.storeshots.json`.
+
 ### Changed
-- Cookie consent is now stored in a small first-party cookie
-  (`storeshots_consent`, ~120 bytes) instead of localStorage, so it travels
-  with the request (readable during SSR) and stays minimal. A returning
-  visitor's existing localStorage consent is migrated into the cookie once and
-  the old key is cleared, so nobody is re-prompted.
+- **Cookie consent is now stored in a small first-party cookie**
+  (`storeshots_consent`, ~120 bytes) instead of localStorage, so it travels with
+  the request (readable during SSR) and stays minimal. A returning visitor's
+  existing localStorage consent is migrated into the cookie once and the old key
+  is cleared, so nobody is re-prompted.
+
+### Fixed
+- **Android phone mockup now matches modern devices**. The frame borrowed the
+  iPhone's aspect ratio (≈9:18) and painted its own fake camera punch-hole on
+  top of the one already in the uploaded screenshot, so captures looked like a
+  different/older device and the cutouts never lined up. The frame now uses a
+  ~9:20 ratio (Pixel/Galaxy) and the painted punch-hole is gone, so the
+  screenshot's real status bar and cutout show through.
 
 ## [0.9.0] — 2026-06-04
 
@@ -416,6 +435,7 @@ Initial public beta.
 - Mobile warning overlay for screen widths the editor does not yet support.
 - AGPL-3.0-or-later license.
 
+[0.10.0]: https://github.com/eralpozcan/storeshots/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/eralpozcan/storeshots/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/eralpozcan/storeshots/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/eralpozcan/storeshots/compare/v0.7.0...v0.8.0

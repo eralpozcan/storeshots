@@ -1,4 +1,5 @@
 import type { UserConfig } from './types'
+import { DEFAULT_FONT_FAMILY } from './fonts'
 
 export const SLIDE_COUNT = 10
 export const SLIDE_COUNT_APPLE = 10
@@ -22,6 +23,8 @@ export const DEFAULT_CONFIG: UserConfig = {
     bgFrom: '#0d1b3e',
     bgTo: '#1a3a7c',
   },
+  fontFamily: DEFAULT_FONT_FAMILY,
+  customFont: null,
   copy: Array.from({ length: SLIDE_COUNT }, (_, i) => ({
     label: i === SLIDE_COUNT - 1 ? 'TRUST' : `FEATURE ${i + 1}`,
     headline: i === SLIDE_COUNT - 1 ? 'Built for\nyou.' : 'Your headline\nhere.',
@@ -98,5 +101,16 @@ export function saveConfig(config: UserConfig): void {
   if (toSave.ai) {
     toSave.ai = { ...toSave.ai, apiKey: '' }
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+  } catch {
+    // Quota exceeded — most likely a large custom font data-URL. Drop it from
+    // persistence (the font stays live in memory + rides project export) so the
+    // rest of the config still saves.
+    try {
+      const { customFont, ...rest } = toSave as UserConfig
+      void customFont
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(rest))
+    } catch { /* give up silently */ }
+  }
 }

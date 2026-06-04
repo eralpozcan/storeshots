@@ -5,13 +5,14 @@ const props = defineProps<{
   textColor: string
   labelColor: string
   cW: number
+  fontFamily: string
 }>()
 
 const lines = computed(() => props.headline.split('\n'))
 </script>
 
 <template>
-  <div style="font-family: Inter, sans-serif">
+  <div :style="{ fontFamily }">
     <div :style="{ fontSize: `${cW * 0.027}px`, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: labelColor, marginBottom: `${cW * 0.016}px` }">
       {{ label }}
     </div>
