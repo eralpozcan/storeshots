@@ -6,7 +6,32 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-06-07
+
 ### Added
+- **Translations manager**. A new "Translations" toolbar action opens a
+  side-by-side table of every selected language. Edit any label/headline inline,
+  **import** a language from a JSON (`[{label, headline}]`) or CSV file,
+  **export** a language's copy as JSON for external translation, and
+  **AI-translate** from one source language into the others (translates the copy
+  you already have instead of re-deriving it from screenshots).
+- **Per-device screenshot picker for paired layouts**. The two-phone layouts
+  (V2/V6) showed the same screenshot on both frames with no way to change the
+  second one. In focused mode each device frame now has a screenshot picker, so
+  you can show a different uploaded screenshot per frame — no more automatic
+  "next slide" reuse and the collisions it caused. Each frame also has its own
+  delete button.
+- **Apply layout to all languages**. Element layout stays per-language on purpose
+  (different word lengths need different placement), but a new "Apply layout →
+  all languages" action in the focused-mode Layout menu copies the current
+  slide's layout (position, variant) into every language at once. Text is left
+  untouched.
+- **Store preview for iPad and tablets**. The store preview was iPhone-only; it
+  now works for every device except the feature graphic, with platform-aware
+  labels (App Store / Play Store).
+- **Headline guidance**. The sidebar headline editor shows a live word/line
+  counter that warns when a headline exceeds the ASO limit (≤5 words/line, ≤2
+  lines), plus a "Fold" badge on slides 1–3 to flag what shows above the fold.
 - **The Feature Graphic is now fully editable**. The 1024×500 Play Store banner
   was a fixed layout; now every piece — app icon, text, and the feature chips —
   can be dragged, resized, and rotated on the canvas. Add or remove text, chip,
@@ -21,6 +46,13 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   revise.
 
 ### Changed
+- **Tidier editor toolbar**. The language switcher moved into the device row
+  (removing a whole toolbar row), the focused-mode actions are grouped under a
+  single "Layout" menu (variant + reset + apply-to-all), and the action bar now
+  wraps instead of clipping buttons off the edge.
+- **Visual slide filmstrip**. The focused-mode slide switcher is now a row of
+  screenshot thumbnails (index badge + label, active slide ringed) instead of
+  plain text chips.
 - **Start templates seed the AI brief** with an audience/tone hint for their
   vertical (SaaS, Game, Finance, Health), so AI generation starts on-target.
 - **Android listings now use all 10 slides** (was 8), matching the App Store, so
@@ -31,6 +63,14 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   same devices are still there, just tidier.
 
 ### Fixed
+- **Brand style "Auto" now works on every device**. Colour extraction read only
+  the iPhone screenshots, so "Auto" did nothing on iPad/Android. It now uses the
+  active device's screenshots and falls back to any uploaded screenshot.
+- **Dark-mode form controls**. On systems set to dark mode, native controls
+  (selects, inputs, the colour picker) rendered with the OS dark theme and became
+  unreadable. The UI is pinned to a light colour-scheme.
+- **Adding an app-icon element with no icon** now shows a warning instead of
+  silently adding an invisible element.
 - **Screenshots no longer repeat across slides**. The two paired-device layouts
   reused a neighbouring slide's screenshot (slides 1 & 2 shared the first, slides
   6 & 7 shared the seventh), so one uploaded screenshot appeared twice while

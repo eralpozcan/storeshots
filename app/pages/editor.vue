@@ -31,6 +31,8 @@ const {
   extractColorsFromScreenshots,
   copyVariants, generateCopyVariants, applyVariant,
   getUploadedImages,
+  applyLayoutToAllLocales, setLocaleCopy, setLocaleCell,
+  exportLocaleCopy, translateLocales,
 } = useScreenshots()
 
 // Keep the uploaded custom font's @font-face injected so it renders in the
@@ -86,8 +88,21 @@ const isFreshEditor = computed(() => {
   return true
 })
 // App Store preview — simulates how the first 3 slides look in a real
-// iOS App Store listing (above-the-fold).
+// store listing (above-the-fold). Available for every device except the
+// feature graphic (which is a single banner, not a slide row).
 const storePreviewOpen = ref(false)
+const storePreviewPlatform = computed(() =>
+  device.value === 'android' || device.value === 'android-7' || device.value === 'android-10'
+    ? 'Play Store'
+    : 'App Store',
+)
+
+// Translations manager — side-by-side table to import / translate / edit every
+// language's copy in one place.
+const translationsOpen = ref(false)
+function onTranslate(payload: { source: string, targets: string[] }) {
+  translateLocales(payload.source, payload.targets)
+}
 
 function applyTemplate(t: StartTemplate) {
   // Apply tone-of-voice fields only — never overwrite user's icon, screenshots, or AI key.
@@ -136,7 +151,7 @@ function exitFocus() { focusedSlideIdx.value = null }
 
 // Read/write helper for the per-slide elements[] override. Used by the
 // transform overlay's element-change events.
-const { patchElement, addElement, removeElement, resetSlide, setVariant, isOverridden } = useElementOverride(config, updateConfig)
+const { resolveElements, patchElement, addElement, removeElement, resetSlide, setVariant, isOverridden } = useElementOverride(config, updateConfig)
 
 // Element factories — used by the focused header's "+ Add" buttons. Each new
 // element gets a unique id (type + random suffix) and a sensible default
@@ -165,6 +180,17 @@ function addCaption(slideIdx: number) {
   })
 }
 function addIcon(slideIdx: number) {
+  // The icon element renders nothing without an uploaded app icon, so adding
+  // one when none exists would silently drop an invisible element. Block it.
+  if (!config.value.appIcon) {
+    toast.add({
+      title: 'No app icon yet',
+      description: 'Upload an app icon in the sidebar (Basics) before adding an icon element.',
+      color: 'warning',
+      icon: 'i-lucide-image-off',
+    })
+    return
+  }
   const variant = resolveVariant(slideIdx)
   addElement(slideIdx, variant, {
     id: uid('icon'), type: 'icon',
@@ -188,6 +214,34 @@ function resolveVariant(i: number): number {
 function onElementChange(slideIdx: number, payload: { id: string, patch: Partial<SlideElement> }) {
   const variant = resolveVariant(slideIdx)
   patchElement(slideIdx, variant, payload.id, payload.patch)
+}
+
+// ─── Per-device screenshot picker (paired-device slides) ───
+// Paired variants (V2/V6) render two device frames. By default both show the
+// slide's own screenshot. This lets the user pick a DIFFERENT uploaded
+// screenshot for each frame explicitly — replacing the old auto "n+1" behaviour
+// that silently consumed the next slide's screenshot and caused collisions.
+const focusedDeviceElements = computed(() => {
+  if (focusedSlideIdx.value === null) return []
+  const variant = resolveVariant(focusedSlideIdx.value)
+  return resolveElements(focusedSlideIdx.value, variant)
+    .filter((e): e is Extract<SlideElement, { type: 'device' }> => e.type === 'device')
+})
+
+// Every screenshot slot for the current device, as picker options.
+const deviceImageOptions = computed(() =>
+  slideConfig.value.images.map((img, idx) => ({ idx, img })),
+)
+
+function deviceElLabel(el: { id: string }): string {
+  if (el.id.includes('bg')) return 'Back'
+  if (el.id.includes('fg')) return 'Front'
+  return 'Device'
+}
+
+function setDeviceImage(elId: string, imageIdx: number) {
+  if (focusedSlideIdx.value === null) return
+  onElementChange(focusedSlideIdx.value, { id: elId, patch: { imageIdx } })
 }
 
 // ─── Feature Graphic editing ───
@@ -235,6 +289,15 @@ function toggleFgChips() {
   }
 }
 function addFgIcon() {
+  if (!config.value.appIcon) {
+    toast.add({
+      title: 'No app icon yet',
+      description: 'Upload an app icon in the sidebar (Basics) before adding an icon element.',
+      color: 'warning',
+      icon: 'i-lucide-image-off',
+    })
+    return
+  }
   writeFg([...config.value.fgElements, {
     id: uid('icon'), type: 'icon', x: 50, y: 50, anchor: 'c', sizePct: 12, zIndex: 7,
   }])
@@ -770,8 +833,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     <div class="flex-1 flex flex-col overflow-hidden relative">
       <!-- Toolbar — two rows: actions on top, device controls below. -->
       <div class="shrink-0 bg-white border-b border-gray-200 z-50">
-        <!-- Row 1: identity + project actions -->
-        <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+        <!-- Row 1: identity + project actions. Wraps so every action stays
+             visible on narrow widths instead of being clipped off the edge. -->
+        <div class="flex flex-wrap items-center justify-between gap-y-2 px-4 py-2 border-b border-gray-100">
           <div class="flex items-center gap-3 min-w-0">
             <NuxtLink
               to="/"
@@ -789,7 +853,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               {{ config.appName || 'My App' }}
             </span>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex flex-wrap items-center justify-end gap-2 ml-auto">
             <UButton
               color="neutral"
               variant="ghost"
@@ -805,11 +869,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               variant="ghost"
               icon="i-lucide-store"
               size="sm"
-              :disabled="!!exporting || device !== 'iphone'"
-              :title="device !== 'iphone' ? 'Switch to iPhone to preview' : 'See how the first 3 slides look in the App Store'"
+              :disabled="!!exporting || device === 'feature-graphic'"
+              :title="device === 'feature-graphic' ? 'Not applicable to the feature graphic' : `See how the first 3 slides look in the ${storePreviewPlatform}`"
               @click="storePreviewOpen = true"
             >
               Store preview
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-languages"
+              size="sm"
+              :disabled="!!exporting || device === 'feature-graphic'"
+              title="Manage, import, and translate copy for every language"
+              @click="translationsOpen = true"
+            >
+              Translations
             </UButton>
             <UButton
               color="neutral"
@@ -993,36 +1068,36 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               {{ s.label }} — {{ s.w }}×{{ s.h }}
             </option>
           </select>
-        </div>
 
-        <!-- Row 3: language tabs (multi-locale editing) -->
-        <div
-          v-if="localeTabs.length > 1"
-          class="flex items-center gap-2 px-4 py-1.5 border-t border-gray-100 overflow-x-auto"
-        >
-          <UIcon
-            name="i-lucide-languages"
-            class="size-4 text-gray-400 shrink-0"
-          />
-          <div class="flex gap-1 bg-gray-100 rounded-lg p-1 items-center shrink-0">
-            <button
-              v-for="t in localeTabs"
-              :key="t.code"
-              class="px-3 py-1 rounded-md border-none cursor-pointer text-xs font-semibold whitespace-nowrap flex items-center gap-1"
-              :class="config.locale === t.code ? 'bg-white text-blue-600 shadow-sm' : 'bg-transparent text-gray-500'"
-              :title="t.hasCopy ? 'Edited / generated' : 'Not generated yet'"
-              @click="switchLocale(t.code)"
-            >
-              {{ t.code.toUpperCase() }}
-              <span
-                v-if="t.hasCopy"
-                class="size-1.5 rounded-full bg-emerald-500 shrink-0"
-              />
-            </button>
+          <!-- Language switcher — folded into the device row (right-aligned) so
+               multi-locale editing doesn't need its own toolbar row. Only shown
+               when more than one language is selected. -->
+          <div
+            v-if="localeTabs.length > 1"
+            class="flex items-center gap-1.5 shrink-0 ml-auto pl-2"
+          >
+            <UIcon
+              name="i-lucide-languages"
+              class="size-4 text-gray-400 shrink-0"
+              title="Generate in the sidebar · edits saved per language"
+            />
+            <div class="flex gap-1 bg-gray-100 rounded-lg p-1 items-center shrink-0">
+              <button
+                v-for="t in localeTabs"
+                :key="t.code"
+                class="px-3 py-1 rounded-md border-none cursor-pointer text-xs font-semibold whitespace-nowrap flex items-center gap-1"
+                :class="config.locale === t.code ? 'bg-white text-blue-600 shadow-sm' : 'bg-transparent text-gray-500'"
+                :title="t.hasCopy ? 'Edited / generated' : 'Not generated yet'"
+                @click="switchLocale(t.code)"
+              >
+                {{ t.code.toUpperCase() }}
+                <span
+                  v-if="t.hasCopy"
+                  class="size-1.5 rounded-full bg-emerald-500 shrink-0"
+                />
+              </button>
+            </div>
           </div>
-          <span class="text-[10px] text-gray-400 whitespace-nowrap">
-            Generate in the sidebar · edits saved per language.
-          </span>
         </div>
       </div>
 
@@ -1300,30 +1375,59 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   </UButton>
                 </UDropdownMenu>
 
-                <!-- Layout variant picker — swap which of the 10 baseline
-                     layouts this slide uses. Changing variant clears any
-                     existing element overrides since they belong to the old
-                     layout's element set. -->
-                <USelect
-                  :model-value="resolveVariant(focusedSlideIdx)"
-                  :items="VARIANT_OPTIONS.map(o => ({ label: `${o.label} — ${o.desc}`, value: o.value }))"
-                  value-key="value"
-                  label-key="label"
-                  size="sm"
-                  class="min-w-[280px]"
-                  @update:model-value="(v: number) => pickVariant(focusedSlideIdx!, v)"
-                />
-                <UButton
-                  size="sm"
-                  :color="isOverridden(focusedSlideIdx) ? 'error' : 'neutral'"
-                  variant="ghost"
-                  icon="i-lucide-rotate-ccw"
-                  :disabled="!isOverridden(focusedSlideIdx)"
-                  :title="isOverridden(focusedSlideIdx) ? 'Restore default layout for this slide' : 'No custom layout to reset'"
-                  @click="resetSlide(focusedSlideIdx)"
-                >
-                  Reset layout
-                </UButton>
+                <!-- Layout menu — groups the variant picker, reset, and the
+                     per-language apply action so the header stays uncluttered. -->
+                <UPopover>
+                  <UButton
+                    size="sm"
+                    color="neutral"
+                    variant="outline"
+                    icon="i-lucide-layout-template"
+                    trailing-icon="i-lucide-chevron-down"
+                  >
+                    Layout
+                  </UButton>
+                  <template #content>
+                    <div class="p-3 w-[300px] space-y-3">
+                      <div>
+                        <label class="block text-[11px] font-semibold text-gray-600 mb-1">Variant</label>
+                        <USelect
+                          :model-value="resolveVariant(focusedSlideIdx)"
+                          :items="VARIANT_OPTIONS.map(o => ({ label: `${o.label} — ${o.desc}`, value: o.value }))"
+                          value-key="value"
+                          label-key="label"
+                          size="sm"
+                          class="w-full"
+                          @update:model-value="(v: number) => pickVariant(focusedSlideIdx!, v)"
+                        />
+                      </div>
+                      <UButton
+                        block
+                        size="sm"
+                        :color="isOverridden(focusedSlideIdx) ? 'error' : 'neutral'"
+                        variant="ghost"
+                        icon="i-lucide-rotate-ccw"
+                        :disabled="!isOverridden(focusedSlideIdx)"
+                        :title="isOverridden(focusedSlideIdx) ? 'Restore default layout for this slide' : 'No custom layout to reset'"
+                        @click="resetSlide(focusedSlideIdx)"
+                      >
+                        Reset layout
+                      </UButton>
+                      <UButton
+                        v-if="localeTabs.length > 1"
+                        block
+                        size="sm"
+                        color="neutral"
+                        variant="soft"
+                        icon="i-lucide-languages"
+                        title="Copy this slide's layout (position, variant) to every language. Text stays per-language."
+                        @click="applyLayoutToAllLocales(focusedSlideIdx)"
+                      >
+                        Apply layout → all languages
+                      </UButton>
+                    </div>
+                  </template>
+                </UPopover>
                 <UButton
                   size="sm"
                   color="neutral"
@@ -1370,19 +1474,119 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               </div>
             </div>
 
-            <!-- Thumb strip — same pattern as the grid view header so muscle
-                 memory carries over. Click to jump to a different slide. -->
-            <div class="shrink-0 bg-white border-t border-gray-200 px-5 py-2 flex gap-1.5 overflow-x-auto">
+            <!-- Per-device screenshot picker — only meaningful when the slide
+                 has device frames. Lets each frame (e.g. the two phones in a
+                 paired layout) show a different uploaded screenshot. -->
+            <div
+              v-if="focusedDeviceElements.length"
+              class="shrink-0 bg-white border-t border-gray-200 px-5 py-2 flex items-center gap-3 overflow-x-auto"
+            >
+              <span class="text-[11px] font-semibold text-gray-500 shrink-0 flex items-center gap-1">
+                <UIcon name="i-lucide-image" class="size-3.5" />
+                Screenshots
+              </span>
+              <div
+                v-for="el in focusedDeviceElements"
+                :key="`devimg-${el.id}`"
+                class="flex items-center gap-1.5 shrink-0"
+              >
+                <span class="text-[11px] text-gray-500">{{ deviceElLabel(el) }}</span>
+                <UPopover>
+                  <button
+                    type="button"
+                    class="flex items-center gap-1 border border-gray-200 rounded-md pl-1 pr-1.5 py-1 hover:border-blue-300 cursor-pointer"
+                    title="Choose which uploaded screenshot this frame shows"
+                  >
+                    <span class="block w-6 h-6 rounded overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
+                      <img
+                        v-if="slideConfig.images[el.imageIdx]"
+                        :src="slideConfig.images[el.imageIdx]!"
+                        class="w-full h-full object-cover"
+                        alt=""
+                      >
+                    </span>
+                    <span class="text-[11px] font-mono text-gray-600">#{{ el.imageIdx + 1 }}</span>
+                    <UIcon name="i-lucide-chevron-down" class="size-3 text-gray-400" />
+                  </button>
+                  <template #content>
+                    <div class="p-2 grid grid-cols-4 gap-1.5 w-[260px]">
+                      <button
+                        v-for="opt in deviceImageOptions"
+                        :key="`opt-${el.id}-${opt.idx}`"
+                        type="button"
+                        class="relative aspect-[9/16] rounded overflow-hidden border-2 cursor-pointer"
+                        :class="opt.idx === el.imageIdx ? 'border-blue-500' : 'border-transparent hover:border-blue-300'"
+                        :title="`Screenshot ${opt.idx + 1}`"
+                        @click="setDeviceImage(el.id, opt.idx)"
+                      >
+                        <img
+                          v-if="opt.img"
+                          :src="opt.img"
+                          class="w-full h-full object-cover"
+                          alt=""
+                        >
+                        <div
+                          v-else
+                          class="w-full h-full bg-gray-100"
+                        />
+                        <span class="absolute bottom-0 left-0 text-[8px] font-mono bg-black/55 text-white px-1 rounded-tr">{{ opt.idx + 1 }}</span>
+                      </button>
+                    </div>
+                  </template>
+                </UPopover>
+                <button
+                  type="button"
+                  class="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 cursor-pointer"
+                  :title="`Remove the ${deviceElLabel(el).toLowerCase()} device frame`"
+                  @click="onElementDelete(focusedSlideIdx!, el.id)"
+                >
+                  <UIcon name="i-lucide-trash-2" class="size-3.5" />
+                </button>
+              </div>
+              <span class="text-[10px] text-gray-400 shrink-0">
+                Pick which uploaded screenshot each frame shows.
+              </span>
+            </div>
+
+            <!-- Slide filmstrip — visual thumbnails of every slide for quick
+                 switching. Screenshot preview + index badge + label; the active
+                 slide is ringed. -->
+            <div class="shrink-0 bg-white border-t border-gray-200 px-4 py-2.5 flex gap-2 overflow-x-auto">
               <button
                 v-for="(_, i) in slideVariants"
                 :key="`focused-thumb-${i}`"
-                class="shrink-0 px-2.5 py-1 rounded-md border text-[11px] font-semibold cursor-pointer transition-colors flex items-center gap-1.5"
-                :class="i === focusedSlideIdx ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-600'"
+                type="button"
+                class="group/th shrink-0 flex flex-col items-center gap-1 cursor-pointer"
                 :title="`Switch to slide ${i + 1}`"
                 @click="enterFocus(i)"
               >
-                <span class="text-gray-400 font-mono">{{ String(i + 1).padStart(2, '0') }}</span>
-                <span class="truncate max-w-[110px]">{{ config.copy[i]?.label || `Slide ${i + 1}` }}</span>
+                <div
+                  class="relative w-12 rounded-lg overflow-hidden border-2 transition-all"
+                  :class="i === focusedSlideIdx ? 'border-blue-500 shadow-md' : 'border-gray-200 group-hover/th:border-blue-300'"
+                  :style="{ aspectRatio: `${canvasDims.cW}/${canvasDims.cH}` }"
+                >
+                  <img
+                    v-if="slideConfig.images[i]"
+                    :src="slideConfig.images[i]!"
+                    class="w-full h-full object-cover"
+                    alt=""
+                  >
+                  <div
+                    v-else
+                    class="w-full h-full bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center"
+                  >
+                    <UIcon name="i-lucide-sparkles" class="size-3 text-gray-300" />
+                  </div>
+                  <span class="absolute top-0 left-0 text-[8px] font-mono font-bold bg-black/55 text-white px-1 rounded-br">
+                    {{ String(i + 1).padStart(2, '0') }}
+                  </span>
+                </div>
+                <span
+                  class="text-[9px] font-semibold max-w-[52px] truncate"
+                  :class="i === focusedSlideIdx ? 'text-blue-600' : 'text-gray-500'"
+                >
+                  {{ config.copy[i]?.label || `Slide ${i + 1}` }}
+                </span>
               </button>
             </div>
           </div>
@@ -1547,10 +1751,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </template>
     </UModal>
 
-    <!-- App Store preview — what the first 3 slides look like above-the-fold. -->
+    <!-- Store preview — what the first 3 slides look like above-the-fold. -->
     <UModal
       v-model:open="storePreviewOpen"
-      title="App Store preview"
+      :title="`${storePreviewPlatform} preview`"
       description="A rough simulation of the listing row most users see first."
       :ui="{ content: 'sm:max-w-2xl' }"
     >
@@ -1613,9 +1817,29 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           </div>
 
           <p class="mt-4 text-[11px] text-gray-400 leading-relaxed">
-            iOS users see the first 3 slides without scrolling. Make sure the strongest hook is in slide 1, the most-used feature in slide 2, and a differentiator or social proof in slide 3.
+            Users see the first 3 slides without scrolling. Make sure the strongest hook is in slide 1, the most-used feature in slide 2, and a differentiator or social proof in slide 3.
           </p>
         </div>
+      </template>
+    </UModal>
+
+    <!-- Translations manager — import / translate / edit every language at once. -->
+    <UModal
+      v-model:open="translationsOpen"
+      title="Translations"
+      description="Manage copy for every language side by side. Import a file, AI-translate from one language, or edit cells directly."
+      :ui="{ content: 'sm:max-w-5xl' }"
+    >
+      <template #body>
+        <TranslationsManager
+          :config="config"
+          :generating="generating"
+          @cell="(p) => setLocaleCell(p.locale, p.idx, p.field, p.value)"
+          @import="(p) => setLocaleCopy(p.locale, p.slides)"
+          @export="(loc) => exportLocaleCopy(loc)"
+          @translate="onTranslate"
+          @switch-locale="(loc) => switchLocale(loc)"
+        />
       </template>
     </UModal>
 

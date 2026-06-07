@@ -90,6 +90,132 @@ export function useScreenshots() {
     updateConfig({ locale, copy: nextCopy, copyByLocale: { ...map, [locale]: nextCopy } })
   }
 
+  // Copy one slide's layout (elements / variant / legacy position) from the
+  // active locale into every other stored locale, keeping each locale's text.
+  // Layout is intentionally per-language (long translations may need their own
+  // placement), so this is an opt-in "apply to all" rather than auto-sync.
+  function applyLayoutToAllLocales(slideIdx: number) {
+    const c = config.value
+    const src = c.copy[slideIdx]
+    if (!src) return
+    const map: Record<string, SlideCopy[]> = { ...c.copyByLocale, [c.locale]: c.copy }
+    for (const loc of Object.keys(map)) {
+      if (loc === c.locale) continue
+      const arr = [...(map[loc] ?? [])]
+      const cur = arr[slideIdx] ?? { label: '', headline: '' }
+      // Drop the target's own layout, then graft the source layout on top of
+      // its text. Omit fields the source doesn't have so we don't write undefined.
+      const { elements, variant, position, ...text } = cur
+      const next: SlideCopy = { ...text }
+      if (src.elements) next.elements = src.elements.map(e => ({ ...e }))
+      if (src.variant != null) next.variant = src.variant
+      if (src.position) next.position = { ...src.position }
+      arr[slideIdx] = next
+      map[loc] = arr
+    }
+    // copy (active locale) is unchanged; only the other locales' stores update.
+    updateConfig({ copyByLocale: map })
+    toast.add({
+      title: 'Layout applied',
+      description: `Slide ${slideIdx + 1} layout copied to all languages.`,
+      color: 'success',
+      icon: 'i-lucide-layout-template',
+    })
+  }
+
+  // Replace a locale's stored copy wholesale (used by file import). Mirrors into
+  // the live `copy` when the imported locale is the one being edited.
+  function setLocaleCopy(locale: string, slides: SlideCopy[]) {
+    const map = { ...config.value.copyByLocale, [locale]: slides }
+    const patch: Partial<UserConfig> = { copyByLocale: map }
+    if (locale === config.value.locale) patch.copy = slides
+    updateConfig(patch)
+  }
+
+  // Edit a single field of a single slide for any locale (translations table).
+  function setLocaleCell(locale: string, slideIdx: number, field: 'label' | 'headline', value: string) {
+    const existing = config.value.copyByLocale[locale] ?? (locale === config.value.locale ? config.value.copy : [])
+    const arr = [...existing]
+    arr[slideIdx] = { ...(arr[slideIdx] ?? { label: '', headline: '' }), [field]: value }
+    setLocaleCopy(locale, arr)
+  }
+
+  // Download a locale's copy as a JSON file for external translation.
+  function exportLocaleCopy(locale: string) {
+    if (import.meta.server) return
+    const slides = (config.value.copyByLocale[locale] ?? (locale === config.value.locale ? config.value.copy : []))
+      .map(s => ({ label: s.label ?? '', headline: s.headline ?? '' }))
+    const blob = new Blob([JSON.stringify(slides, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const slug = (config.value.appName || 'app').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app'
+    a.download = `${slug}-${locale}.json`
+    a.href = url
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // AI-translate the source locale's existing copy into the target locales,
+  // preserving slide structure. Unlike generateLocales (which re-derives from
+  // screenshots), this translates the text the user already has.
+  async function translateLocales(sourceLocale: string, targetLocales: string[]) {
+    if (!config.value.ai.apiKey) {
+      toast.add({
+        title: 'API key missing',
+        description: 'Add an OpenRouter or Anthropic API key before translating.',
+        color: 'warning',
+        icon: 'i-lucide-key',
+      })
+      return
+    }
+    const source = config.value.copyByLocale[sourceLocale]
+      ?? (sourceLocale === config.value.locale ? config.value.copy : [])
+    const slides = source.map(s => ({ label: s.label ?? '', headline: s.headline ?? '' }))
+    const targets = targetLocales.filter(l => l !== sourceLocale)
+    if (!slides.length || !targets.length) return
+    generating.value = true
+    try {
+      const res = await $fetch('/api/translate', {
+        method: 'POST',
+        body: {
+          provider: config.value.ai.provider,
+          apiKey: config.value.ai.apiKey,
+          openrouterModel: config.value.ai.openrouterModel,
+          claudeModel: config.value.ai.claudeModel,
+          sourceLocale,
+          targetLocales: targets,
+          slides,
+        },
+      }) as { locales?: Record<string, any[]> }
+      const map = { ...config.value.copyByLocale }
+      let count = 0
+      for (const loc of targets) {
+        const out = res.locales?.[loc]
+        if (out?.length) {
+          map[loc] = out.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
+          count++
+        }
+      }
+      const active = config.value.locale
+      updateConfig({
+        copyByLocale: map,
+        copy: map[active]?.length ? map[active]! : config.value.copy,
+      })
+      toast.add({
+        title: 'Translation ready',
+        description: `${count} language${count === 1 ? '' : 's'} translated from ${sourceLocale.toUpperCase()}.`,
+        color: 'success',
+        icon: 'i-lucide-languages',
+      })
+    }
+    catch (e: any) {
+      showAIError('Translation failed', e)
+    }
+    finally {
+      generating.value = false
+    }
+  }
+
   const canvasDims = computed(() => {
     const d = device.value
     const o = orientation.value
@@ -456,9 +582,34 @@ export function useScreenshots() {
   // as the slide palette. Pure client-side (canvas + colour quantisation), so
   // it works without an AI key. Falls back gracefully if the screenshots are
   // too uniform to extract anything useful.
+  // Screenshots of the device currently being edited. Used so "Auto" colour
+  // extraction works on whatever device the user is looking at (iPad, Android,
+  // …) instead of always reading the iPhone slots.
+  function currentDeviceImages(): string[] {
+    const c = config.value
+    const o = orientation.value
+    const map: Record<string, (string | null)[]> = {
+      iphone: c.images.iphone,
+      android: c.images.androidPhone,
+      'android-7': o === 'landscape' ? c.images.androidTablet7L : c.images.androidTablet7P,
+      'android-10': o === 'landscape' ? c.images.androidTablet10L : c.images.androidTablet10P,
+      ipad: c.images.ipad,
+      'feature-graphic': c.images.iphone,
+    }
+    return (map[device.value] ?? c.images.iphone).filter((s): s is string => !!s)
+  }
+
   async function extractColorsFromScreenshots() {
     if (import.meta.server) return
-    const sources = config.value.images.iphone.filter((s): s is string => !!s)
+    // Prefer the active device's screenshots; if that device has none uploaded
+    // (e.g. iPad selected but only iPhone shots exist), fall back to any
+    // uploaded screenshot so Auto still produces a palette.
+    let sources = currentDeviceImages()
+    if (!sources.length) {
+      sources = Object.values(config.value.images)
+        .flat()
+        .filter((s): s is string => !!s)
+    }
     if (!sources.length) {
       toast.add({
         title: 'No screenshots yet',
@@ -599,6 +750,11 @@ export function useScreenshots() {
     sizePick,
     updateConfig,
     switchLocale,
+    applyLayoutToAllLocales,
+    setLocaleCopy,
+    setLocaleCell,
+    exportLocaleCopy,
+    translateLocales,
     generateLocales,
     generateCopy,
     generateFullDesign,

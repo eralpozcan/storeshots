@@ -1,3 +1,10 @@
 @import "tailwindcss";
 @variant dark (&:is(.dark, .dark *));
 @import "@nuxt/ui";
+
+/* The whole UI is designed light-only. Pin color-scheme to light so native
+   form controls (select, input, textarea, the colour picker) don't render with
+   the OS dark theme — which made dropdowns/inputs unreadable on dark systems. */
+:root {
+  color-scheme: light;
+}

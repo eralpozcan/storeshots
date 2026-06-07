@@ -6,37 +6,7 @@ import {
   BUILTIN_FONTS, fontFormatFromName, MAX_FONT_BYTES, ALLOWED_FONT_EXT,
   DEFAULT_FONT_FAMILY, CUSTOM_FONT_VALUE, CUSTOM_FONT_STACK,
 } from '~/utils/fonts'
-
-const LOCALE_OPTIONS = [
-  { label: '🇬🇧 English', value: 'en' },
-  { label: '🇩🇪 Deutsch', value: 'de' },
-  { label: '🇫🇷 Français', value: 'fr' },
-  { label: '🇪🇸 Español', value: 'es' },
-  { label: '🇧🇷 Português (Brasil)', value: 'pt' },
-  { label: '🇵🇹 Português (Portugal)', value: 'pt-PT' },
-  { label: '🇮🇹 Italiano', value: 'it' },
-  { label: '🇳🇱 Nederlands', value: 'nl' },
-  { label: '🇵🇱 Polski', value: 'pl' },
-  { label: '🇷🇺 Русский', value: 'ru' },
-  { label: '🇺🇦 Українська', value: 'uk' },
-  { label: '🇸🇪 Svenska', value: 'sv' },
-  { label: '🇩🇰 Dansk', value: 'da' },
-  { label: '🇳🇴 Norsk', value: 'no' },
-  { label: '🇫🇮 Suomi', value: 'fi' },
-  { label: '🇨🇿 Čeština', value: 'cs' },
-  { label: '🇷🇴 Română', value: 'ro' },
-  { label: '🇭🇺 Magyar', value: 'hu' },
-  { label: '🇹🇷 Türkçe', value: 'tr' },
-  { label: '🇸🇦 العربية', value: 'ar' },
-  { label: '🇮🇳 हिन्दी', value: 'hi' },
-  { label: '🇯🇵 日本語', value: 'ja' },
-  { label: '🇨🇳 中文 (简体)', value: 'zh' },
-  { label: '🇹🇼 中文 (繁體)', value: 'zh-TW' },
-  { label: '🇰🇷 한국어', value: 'ko' },
-  { label: '🇮🇩 Bahasa Indonesia', value: 'id' },
-  { label: '🇻🇳 Tiếng Việt', value: 'vi' },
-  { label: '🇹🇭 ภาษาไทย', value: 'th' },
-]
+import { LOCALE_OPTIONS } from '~/utils/locales'
 
 const props = defineProps<{
   config: UserConfig
@@ -141,6 +111,18 @@ function updateCopy(idx: number, field: keyof SlideCopy, value: string) {
   const copy = [...props.config.copy]
   copy[idx] = { ...copy[idx]!, [field]: value } as SlideCopy
   emit('change', { copy })
+}
+
+// Headline guidance — the ASO rule is max 5 words/line, max 2 lines. Surface
+// a live, non-blocking hint so users see when a headline runs long (which is
+// what makes a slide caption wrap badly or overflow the canvas).
+const HEADLINE_MAX_WORDS = 5
+const HEADLINE_MAX_LINES = 2
+function headlineStat(headline: string | undefined) {
+  const lines = (headline ?? '').split('\n')
+  const maxWords = Math.max(0, ...lines.map(l => l.trim().split(/\s+/).filter(Boolean).length))
+  const over = lines.length > HEADLINE_MAX_LINES || maxWords > HEADLINE_MAX_WORDS
+  return { lines: lines.length, maxWords, over }
 }
 
 // ─── Drag & Drop for slide reorder ───
@@ -829,7 +811,11 @@ function handleReset() {
           <span class="text-[10px] text-gray-400 shrink-0">drag to reorder</span>
         </div>
         <p class="text-xs text-gray-500 leading-relaxed">
-          Edit copy inline. Reorder by dragging a row.
+          Edit copy inline. Reorder by dragging a row. Aim for ≤{{ HEADLINE_MAX_WORDS }} words per line, ≤{{ HEADLINE_MAX_LINES }} lines.
+        </p>
+        <p class="text-[10px] text-blue-600 leading-relaxed flex items-center gap-1">
+          <UIcon name="i-lucide-eye" class="size-3 shrink-0" />
+          Slides 1–3 show above the fold — put your strongest hooks there.
         </p>
       </header>
       <div
@@ -862,6 +848,11 @@ function handleReset() {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1.5 mb-1">
               <span class="text-[9px] font-bold text-white bg-gray-400 rounded px-1 py-px leading-none">{{ i + 1 }}</span>
+              <span
+                v-if="i < 3"
+                class="text-[8px] font-bold text-blue-600 bg-blue-50 rounded px-1 py-px leading-none uppercase tracking-wide"
+                title="Visible above the fold in the store listing"
+              >Fold</span>
               <!-- Thumbnail preview -->
               <div
                 v-if="config.images.iphone[i]"
@@ -881,9 +872,22 @@ function handleReset() {
               :value="slide?.headline"
               placeholder="Line one&#10;Line two"
               :rows="2"
-              class="w-full text-xs border border-gray-200 rounded px-2 py-1 resize-y font-[inherit] text-gray-700 bg-gray-50"
+              class="w-full text-xs border rounded px-2 py-1 resize-y font-[inherit] text-gray-700 bg-gray-50"
+              :class="headlineStat(slide?.headline).over ? 'border-amber-400' : 'border-gray-200'"
               @input="updateCopy(i, 'headline', ($event.target as HTMLTextAreaElement).value)"
             />
+            <div
+              class="mt-0.5 text-[9px] flex items-center gap-1"
+              :class="headlineStat(slide?.headline).over ? 'text-amber-600' : 'text-gray-400'"
+            >
+              <UIcon
+                v-if="headlineStat(slide?.headline).over"
+                name="i-lucide-triangle-alert"
+                class="size-2.5 shrink-0"
+              />
+              {{ headlineStat(slide?.headline).lines }} line{{ headlineStat(slide?.headline).lines === 1 ? '' : 's' }} ·
+              {{ headlineStat(slide?.headline).maxWords }} words/line max
+            </div>
           </div>
         </div>
       </div>
