@@ -22,41 +22,49 @@ See the full [`CHANGELOG.md`](CHANGELOG.md) or the [`/changelog` page](https://s
 
 ### Editor
 - **Guided 5-step wizard sidebar** — Basics · Screenshots · AI · Headlines · Style. Single-open accordion with step-completion hints so a new user always knows what to do next.
-- **Quick-start templates** — Pre-filled tone of voice for SaaS / Game / Finance / Health. Auto-opens on a fresh editor; never overwrites the user's icon, screenshots, or AI key.
+- **Quick-start templates** — Pre-filled tone of voice for SaaS / Game / Finance / Health, and each seeds the AI brief with an audience/tone hint for its vertical. Auto-opens on a fresh editor; never overwrites the user's icon, screenshots, or AI key.
+- **Focused canvas editing** — Open any slide in focused mode to drag, resize, and rotate individual elements (caption, device, icon, chips) directly on the canvas. Layout is stored per element, persists into exports, and rides along in the project file.
+- **Per-device screenshot picker for paired layouts** — Two-phone layouts (V2/V6) let you pick a different uploaded screenshot per frame, each with its own delete button — no more automatic "next slide" reuse and the collisions it caused.
+- **Apply layout to all languages** — Layout stays per-language by default (different word lengths need different placement), but one action copies the current slide's layout into every language at once, leaving text untouched.
 - **Inline slide editing** — Pencil button on each slide opens a modal with label + headline fields. No more scrolling the sidebar to find slide N.
-- **Caption drag-to-reposition** — A "Move" button enters fine-tune mode where the caption position can be dragged in canvas-pixel space. The offset persists into bundle exports.
-- **App Store preview** — A "Store preview" mode renders the first three slides in a simulated iOS App Store row so you can sanity-check what users see above the fold.
+- **Headline ASO guidance** — Live word/line counter warns when a headline exceeds the ASO limit (≤5 words/line, ≤2 lines), plus a "Fold" badge on slides 1–3 to flag what shows above the fold.
+- **Store preview** — A "Store preview" mode renders the leading slides in a simulated store row (platform-aware App Store / Play Store labels) for every device except the feature graphic.
+- **Per-language editing** — Generated languages are kept in state (`copyByLocale`); a language tab bar above the canvas lets you switch and edit copy per language, with a green dot marking languages that already have copy.
 - **Sticky thumbnails strip** — Quick visual index of all 10 slides; click to scroll-jump to the one you care about.
 - **Drag-to-reorder slides** — Reorder either screenshots or slide copy from the sidebar (copy + image move together).
 - **Empty-state hints + keyboard shortcuts** — `⌘/Ctrl + E` exports all, `⌘/Ctrl + G` generates copy, `Esc` closes modals. Skips while typing.
 
 ### AI generation
-- **Multi-provider** — Claude (Anthropic) with a model picker (Opus 4.7 / Sonnet 4.6 / Haiku 4.5 / older 3.5 Sonnet & Haiku), or 300+ models via OpenRouter (including free options).
+- **Multi-provider** — Claude (Anthropic) with a model picker (Opus 4.7 / Sonnet 4.6 / Haiku 4.5), or 300+ models via OpenRouter (including free options).
 - **Vision analysis** — Upload screenshots, AI analyses each screen and writes context-aware headlines. Free text-only models work too but generate generic copy.
+- **AI brief** — An optional free-text box steers copy generation (audience, tone, keywords, differentiators) on top of the app name, description, and screenshots. Fed into ✦ Headlines, ✦ Full design, and multi-language generation.
 - **Smart slide ordering** — AI reorders slides for maximum App Store conversion (hero → primary feature → differentiator → trust).
+- **AI-suggested feature chips** — ✦ Full design returns a prioritised feature list that fills the feature-graphic chips and the Key features field, ready to revise.
 - **Copy variants** — Generate three tone-of-voice alternatives (confident · warm · punchy) to A/B test direction without rerunning the vision pipeline. Picking a variant preserves any per-slide position fine-tunes.
-- **Multi-language** — Generate headlines in 13 locales (EN, TR, DE, FR, ES, IT, PT, NL, JA, KO, ZH, RU, AR).
+- **Multi-language** — Generate headlines in 28 locales (EN, DE, FR, ES, PT, PT-PT, IT, NL, PL, RU, UK, SV, DA, NO, FI, CS, RO, HU, TR, AR, HI, JA, ZH, ZH-TW, KO, ID, VI, TH).
+- **Translations manager** — A side-by-side table of every selected language. Edit any label/headline inline, **import** a language from JSON (`[{label, headline}]`) or CSV, **export** a language's copy as JSON, and **AI-translate** from one source language into the others (translates the copy you already have instead of re-deriving it from screenshots).
 
 ### Style
-- **Auto palette from screenshots** — A wand button on the Style step extracts a brand palette (primary + accent + bg gradient) via a tiny client-side colour quantiser. **No AI key required.** Skips near-white / near-black / near-grey buckets so the result reflects real brand colour, not background.
+- **Auto palette from screenshots** — A wand button on the Style step extracts a brand palette (primary + accent + bg gradient) via a tiny client-side colour quantiser. **No AI key required.** Reads the active device's screenshots, skipping near-white / near-black / near-grey buckets so the result reflects real brand colour, not background.
 - **Manual brand palette** — 6-colour grid (primary, accent, dark/light text, bg gradient endpoints) with hex inputs and colour pickers.
+- **Typeface picker** — Eight built-in fonts (Inter, Poppins, Montserrat, DM Sans, Space Grotesk, Roboto, Playfair Display, Lora) each previewed in its own typeface, plus upload of your own `.ttf`/`.otf`/`.woff`/`.woff2` (max 2 MB). The chosen font applies to every slide, embeds into PNG exports, and travels inside the exported `.storeshots.json`.
 - **10 slide templates** — Unique layouts with light / dark themes, gradient backgrounds, decorative blobs, single + dual-device compositions, and a centred "trust" closing slide.
 - **Realistic device frames** — iPhone (PNG), Android phones, Android 7"/10" tablets (portrait + landscape), iPad (CSS-rendered).
 
 ### Export
-- **One-click bundle export** — A "Bundle" dropdown produces every size a target store accepts in a single ZIP, organised by device-size folders. Three presets:
+- **Configurable export dialog** — A single **Export** button opens a panel to pick any combination of languages × devices × sizes and download them as one ZIP, nested as `<language>/<device>/<size>/NN-label.png` (the language folder is omitted when only one language is selected). Three store presets act as one-click quick-fills:
   - **App Store** — iPhone 6.9", 6.5", 6.3", 6.1" + iPad Pro 12.9", 11"
   - **Play Store** — Android Phone, 7" Tablet, 10" Tablet
   - **Everything** — union of both
 - **Single-size export** — Per-slide PNG download via the explicit ⬇ Download button on each slide card. Card body is intentionally not a click target so users can't trigger downloads by accident.
-- **Feature Graphic** — Dedicated 1024×500 Google Play banner template with its own download button.
+- **Editable Feature Graphic** — The 1024×500 Google Play banner is fully editable: drag, resize, and rotate the app icon, text, and feature chips; add or remove elements; reset to default. Custom layouts ride along in the project file.
 - **Project save / load** — Versioned `.storeshots.json` snapshots include the full project state. The exported file strips the API key so a shared snapshot never leaks credentials.
 
 ### Privacy & security
 - **Cookieless analytics** — [Umami](https://umami.is) (MIT-licensed, GDPR-safe) gated behind the analytics cookie-consent toggle via `useScriptTriggerConsent`. No third-party tracking.
 - **API keys never leave the browser** — Held in `sessionStorage` for the current tab only, cleared on tab close, never written to localStorage or sent to anyone but the AI provider.
 - **Hardened CSP** — Per-request nonce via `nuxt-security`, no `'unsafe-inline'` for scripts, narrow allowlist for the analytics origin.
-- **Server-side input validation** — `/api/generate-copy`, `/api/copy-variants`, `/api/translate-copy` all enforce body size caps, field length limits, provider whitelist, and max-image checks.
+- **Server-side input validation** — `/api/generate-copy`, `/api/copy-variants`, `/api/translate` all enforce body size caps, field length limits, provider whitelist, and max-image checks.
 - **Update banner** — When a new deploy goes live, open tabs detect the change by polling `/api/version` (every 5 min and on tab focus) and surface a "Refresh" prompt instead of silently 404-ing on stale hashed asset URLs.
 
 ---
@@ -104,26 +112,26 @@ Upload your actual app screenshots — these go inside the device mockups. Up to
 
 ### 3. AI
 
-Pick a provider (Claude / OpenRouter), paste a key, choose a model and language, then run one of:
+Pick a provider (Claude / OpenRouter), paste a key, choose a model and language, optionally write an AI brief, then run one of:
 
 | Button | What it does |
 |--------|-------------|
 | **✦ Headlines** | Analyses screenshots → generates matching headlines per slide |
-| **✦ Full design** | Analyses screenshots → generates headlines + derives brand colour palette |
+| **✦ Full design** | Analyses screenshots → generates headlines + feature chips + derives brand colour palette |
 
 AI reorders slides for optimal App Store conversion: hero → primary feature → differentiator → supporting features → trust.
 
 ### 4. Headlines
 
-Review and edit the generated copy. Drag rows to reorder. Or click the pencil icon on any preview slide to edit inline.
+Review and edit the generated copy. Drag rows to reorder, or click the pencil icon on any preview slide to edit inline. Open the **Translations** dialog to manage every selected language side by side — edit, import/export, or AI-translate.
 
 ### 5. Style
 
-Tweak the brand palette manually, or hit **Auto** to derive it from your uploaded screenshots client-side.
+Tweak the brand palette manually, hit **Auto** to derive it from your uploaded screenshots client-side, and pick a typeface (built-in or your own uploaded font).
 
-### Bundle and export
+### Export
 
-The toolbar's **Bundle** dropdown produces every size a target store accepts in a single ZIP. The **Project** dropdown saves / loads `.storeshots.json` snapshots so you never lose work.
+The toolbar's **Export** button opens a dialog to pick any combination of languages × devices × sizes and download them as one ZIP. The **Project** dropdown saves / loads `.storeshots.json` snapshots so you never lose work.
 
 ---
 
@@ -141,8 +149,6 @@ The toolbar's **Bundle** dropdown produces every size a target store accepts in 
 | `claude-opus-4-7` | Highest quality, most nuanced copy |
 | `claude-sonnet-4-6` | Balanced (default) |
 | `claude-haiku-4-5-20251001` | Fast and cheap |
-| `claude-3-5-sonnet-20241022` | Older but still strong, vision-ready |
-| `claude-3-5-haiku-20241022` | Older, cheap |
 
 ### Recommended OpenRouter models
 
@@ -183,7 +189,7 @@ The toolbar's **Bundle** dropdown produces every size a target store accepts in 
 | Android 10" Tablet (Landscape) | 2560 × 1600 |
 | Feature Graphic | 1024 × 500 |
 
-The **Bundle** dropdown produces every relevant size at once and packages the result as a ZIP.
+The **Export** dialog produces every selected size at once and packages the result as a ZIP.
 
 ---
 
@@ -211,12 +217,12 @@ The **Bundle** dropdown produces every relevant size at once and packages the re
 | Framework | Nuxt 4 + Vue 3 |
 | UI kit | @nuxt/ui 4 |
 | Styling | Tailwind CSS 4 |
-| Font | Inter (via @nuxt/fonts) |
+| Fonts | @nuxt/fonts + 8 built-in typefaces + custom font upload |
 | SEO | @nuxtjs/seo (sitemap, robots, OG, schema.org) |
 | Security | nuxt-security (CSP nonce, rate limiting) |
 | Analytics | Umami via @nuxt/scripts (cookieless, consent-gated) |
-| Markdown sanitiser | jagajs (zero-dep, serverless-safe) |
-| Bundle export | jszip (client-side ZIP packaging) |
+| Markdown | marked (render) + jagajs/sanitize (zero-dep, serverless-safe) |
+| ZIP export | jszip (client-side packaging) |
 | PNG capture | html-to-image |
 | AI | Anthropic Messages API · OpenRouter Chat Completions |
 
@@ -237,16 +243,20 @@ storeshots/
 │   ├── components/
 │   │   ├── AppSidebar.vue           # 5-step wizard sidebar
 │   │   ├── SlideCard.vue            # Preview card (edit / move / download buttons)
+│   │   ├── TranslationsManager.vue  # Side-by-side per-language copy table
 │   │   ├── CookieBanner.vue         # Granular cookie consent banner
 │   │   ├── UpdateBanner.vue         # New-deploy refresh prompt
 │   │   └── slides/
 │   │       ├── DeviceFrames.vue     # iPhone / Android / iPad frames
 │   │       ├── SlideTemplate.vue    # 10 slide templates with caption transform
+│   │       ├── SlideElementRenderer.vue # Draggable per-element renderer
+│   │       ├── SlideTransformOverlay.vue # Drag / resize / rotate handles
 │   │       ├── SlideBlob.vue        # Decorative blobs
 │   │       ├── SlideCaption.vue     # Headline + label
-│   │       └── FeatureGraphic.vue   # Google Play feature graphic
+│   │       └── FeatureGraphic.vue   # Editable Google Play feature graphic
 │   ├── composables/
 │   │   ├── useScreenshots.ts        # Editor state, AI calls, export, project I/O
+│   │   ├── useElementOverride.ts    # Per-element layout overrides
 │   │   ├── useCookieConsent.ts      # Versioned consent state + DNT respect
 │   │   ├── useUpdateAvailable.ts    # /api/version polling + visibility check
 │   │   └── useMockup.ts             # iPhone PNG preload
@@ -257,12 +267,15 @@ storeshots/
 │       ├── defaults.ts              # DEFAULT_CONFIG + load/save
 │       ├── canvas.ts                # Canvas dims + STORE_PRESETS
 │       ├── templates.ts             # Quick-start templates (SaaS / Game / Finance / Health)
+│       ├── locales.ts              # Language list for picker + translations
+│       ├── fonts.ts                # Built-in typefaces + custom font handling
+│       ├── anchor.ts               # Element anchor / transform math
 │       ├── color-extract.ts         # Client-side palette quantiser
 │       └── analytics.ts             # Shared scriptsConsent trigger
 ├── server/api/
 │   ├── generate-copy.post.ts        # Vision + text → slides + colours
 │   ├── copy-variants.post.ts        # Three tone-of-voice alternatives
-│   ├── translate-copy.post.ts       # Multi-locale translation
+│   ├── translate.post.ts            # Multi-locale translation
 │   └── version.get.ts               # Build id used by the update banner
 ├── public/
 │   ├── mockup.png                   # iPhone mockup image
@@ -309,14 +322,15 @@ Areas of interest:
 Built upon the concepts from [ParthJadhav/app-store-screenshots](https://github.com/ParthJadhav/app-store-screenshots) — an AI skill that generates App Store screenshots through coding agents. Storeshots evolves that into a standalone visual application with:
 
 - A guided 5-step wizard editor with quick-start templates
-- AI vision analysis, copy variants, and smart slide ordering
-- Caption drag-to-reposition fine-tuning
-- One-click bundle exports for every store size
+- AI vision analysis, an AI brief, copy variants, and smart slide ordering
+- Focused per-element canvas editing (drag / resize / rotate) plus an editable feature graphic
+- A typeface picker with custom font upload
+- Configurable exports (languages × devices × sizes) for every store size
 - Project save / load via portable `.storeshots.json` files
 - Privacy-first analytics (Umami, cookieless, consent-gated)
 - Per-deploy update detection with a Refresh prompt
 - Multi-provider AI (Claude with model picker + OpenRouter with 300+ models)
-- Multi-language headline generation (13 locales)
+- Multi-language headline generation (28 locales) with a translations manager
 
 ---
 
