@@ -4,9 +4,9 @@ import { extractPalette } from '~/utils/color-extract'
 import { resolveFontStack } from '~/utils/fonts'
 import {
   W, H, AW, AH, AT7P_W, AT7P_H, AT7L_W, AT7L_H,
-  AT10P_W, AT10P_H, AT10L_W, AT10L_H, IPAD_W, IPAD_H, FGW, FGH,
+  AT10P_W, AT10P_H, AT10L_W, AT10L_H, IPAD_W, IPAD_H, IPAD_L_W, IPAD_L_H, FGW, FGH,
   IPHONE_SIZES, ANDROID_SIZES, ANDROID_7P_SIZES, ANDROID_7L_SIZES,
-  ANDROID_10P_SIZES, ANDROID_10L_SIZES, IPAD_SIZES, FG_SIZES,
+  ANDROID_10P_SIZES, ANDROID_10L_SIZES, IPAD_SIZES, IPAD_L_SIZES, FG_SIZES,
 } from '~/utils/canvas'
 
 // Downscale a base64 data URL to a small JPEG for AI vision analysis.
@@ -46,7 +46,7 @@ export function useScreenshots() {
   const generating = ref(false)
   const ready = ref(false)
 
-  const isTablet = computed(() => device.value === 'android-7' || device.value === 'android-10')
+  const isTablet = computed(() => device.value === 'android-7' || device.value === 'android-10' || device.value === 'ipad')
 
   function updateConfig(patch: Partial<UserConfig>) {
     const prev = config.value
@@ -222,7 +222,9 @@ export function useScreenshots() {
     if (d === 'feature-graphic') return { cW: FGW, cH: FGH, sizes: FG_SIZES as readonly { label: string; w: number; h: number }[] }
     if (d === 'iphone')   return { cW: W, cH: H, sizes: IPHONE_SIZES as readonly { label: string; w: number; h: number }[] }
     if (d === 'android')  return { cW: AW, cH: AH, sizes: ANDROID_SIZES as readonly { label: string; w: number; h: number }[] }
-    if (d === 'ipad')     return { cW: IPAD_W, cH: IPAD_H, sizes: IPAD_SIZES as readonly { label: string; w: number; h: number }[] }
+    if (d === 'ipad')     return o === 'landscape'
+      ? { cW: IPAD_L_W, cH: IPAD_L_H, sizes: IPAD_L_SIZES as readonly { label: string; w: number; h: number }[] }
+      : { cW: IPAD_W, cH: IPAD_H, sizes: IPAD_SIZES as readonly { label: string; w: number; h: number }[] }
     if (d === 'android-7') return o === 'landscape'
       ? { cW: AT7L_W, cH: AT7L_H, sizes: ANDROID_7L_SIZES as readonly { label: string; w: number; h: number }[] }
       : { cW: AT7P_W, cH: AT7P_H, sizes: ANDROID_7P_SIZES as readonly { label: string; w: number; h: number }[] }
@@ -240,7 +242,7 @@ export function useScreenshots() {
       android: c.images.androidPhone,
       'android-7': o === 'landscape' ? c.images.androidTablet7L : c.images.androidTablet7P,
       'android-10': o === 'landscape' ? c.images.androidTablet10L : c.images.androidTablet10P,
-      ipad: c.images.ipad,
+      ipad: o === 'landscape' ? c.images.ipadLandscape : c.images.ipad,
       'feature-graphic': c.images.iphone,
     }
     return {
@@ -593,7 +595,7 @@ export function useScreenshots() {
       android: c.images.androidPhone,
       'android-7': o === 'landscape' ? c.images.androidTablet7L : c.images.androidTablet7P,
       'android-10': o === 'landscape' ? c.images.androidTablet10L : c.images.androidTablet10P,
-      ipad: c.images.ipad,
+      ipad: o === 'landscape' ? c.images.ipadLandscape : c.images.ipad,
       'feature-graphic': c.images.iphone,
     }
     return (map[device.value] ?? c.images.iphone).filter((s): s is string => !!s)

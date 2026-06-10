@@ -36,6 +36,7 @@ export const DEFAULT_CONFIG: UserConfig = {
   images: {
     iphone: [...EMPTY_IMAGES],
     ipad: [...EMPTY_IMAGES],
+    ipadLandscape: [...EMPTY_IMAGES],
     androidPhone: [...EMPTY_IMAGES],
     androidTablet7P: [...EMPTY_IMAGES],
     androidTablet7L: [...EMPTY_IMAGES],

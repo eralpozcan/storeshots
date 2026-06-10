@@ -2,7 +2,7 @@
 import { MK_W, MK_H, SC_L, SC_T, SC_W, SC_H, SC_RX, SC_RY, TAB_P_RATIO, TAB_L_RATIO, ANDROID_RATIO } from '~/utils/canvas'
 
 defineProps<{
-  type: 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad'
+  type: 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad' | 'ipad-l'
   src: string
   alt?: string
   style?: Record<string, string | undefined>
@@ -80,6 +80,20 @@ const { mockupUrl } = useMockup()
       <div :style="{ position: 'absolute', inset: '0', borderRadius: '5% / 3.6%', border: '1px solid rgba(255,255,255,0.06)', pointerEvents: 'none', zIndex: 15 }" />
       <div :style="{ position: 'absolute', left: '4%', top: '2.8%', width: '92%', height: '94.4%', borderRadius: '2.2% / 1.6%', overflow: 'hidden', background: '#000' }">
         <img :src="src" :alt="alt" :style="{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }" draggable="false">
+      </div>
+    </div>
+  </div>
+
+  <!-- iPad Landscape -->
+  <div
+    v-else-if="type === 'ipad-l'"
+    :style="{ position: 'absolute', aspectRatio: '1000/770', ...style }"
+  >
+    <div :style="{ width: '100%', height: '100%', borderRadius: '3.6% / 5%', background: 'linear-gradient(180deg,#2C2C2E 0%,#1C1C1E 100%)', position: 'relative', overflow: 'hidden', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1), 0 8px 40px rgba(0,0,0,0.6)' }">
+      <div :style="{ position: 'absolute', left: '1.2%', top: '50%', transform: 'translateY(-50%)', width: '0.65%', height: '0.9%', borderRadius: '50%', background: '#111113', border: '1px solid rgba(255,255,255,0.08)', zIndex: 20 }" />
+      <div :style="{ position: 'absolute', inset: '0', borderRadius: '3.6% / 5%', border: '1px solid rgba(255,255,255,0.06)', pointerEvents: 'none', zIndex: 15 }" />
+      <div :style="{ position: 'absolute', left: '2.8%', top: '4%', width: '94.4%', height: '92%', borderRadius: '1.6% / 2.2%', overflow: 'hidden', background: '#000' }">
+        <img :src="src" :alt="alt" :style="{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top left' }" draggable="false">
       </div>
     </div>
   </div>

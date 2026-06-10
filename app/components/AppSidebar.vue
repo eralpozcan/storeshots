@@ -90,7 +90,8 @@ const DEVICE_GROUPS: { label: string; items: { key: ImagesKey; label: string }[]
   {
     label: 'Tablet',
     items: [
-      { key: 'ipad', label: 'iPad' },
+      { key: 'ipad', label: 'iPad ↕' },
+      { key: 'ipadLandscape', label: 'iPad ↔' },
       { key: 'androidTablet7P', label: 'Android 7" ↕' },
       { key: 'androidTablet7L', label: 'Android 7" ↔' },
       { key: 'androidTablet10P', label: 'Android 10" ↕' },

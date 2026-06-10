@@ -145,6 +145,7 @@ export type UserConfig = {
   images: {
     iphone: DeviceImages
     ipad: DeviceImages
+    ipadLandscape: DeviceImages
     androidPhone: DeviceImages
     androidTablet7P: DeviceImages
     androidTablet7L: DeviceImages

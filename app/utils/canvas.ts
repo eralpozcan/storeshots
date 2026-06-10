@@ -8,6 +8,7 @@ export const AT7L_W = 1920;   export const AT7L_H = 1200
 export const AT10P_W = 1600;  export const AT10P_H = 2560
 export const AT10L_W = 2560;  export const AT10L_H = 1600
 export const IPAD_W = 2048;   export const IPAD_H = 2732
+export const IPAD_L_W = 2732; export const IPAD_L_H = 2048
 export const FGW = 1024;      export const FGH = 500
 
 // iPhone mockup values
@@ -24,6 +25,7 @@ export const SC_RY = (126  / 1990) * 100
 export const TAB_P_RATIO = 0.667
 export const TAB_L_RATIO = 1.5
 export const IPAD_RATIO  = 0.770
+export const IPAD_L_RATIO = 1.30
 // Modern Android phone body ratio. Chosen so the 93%×97% screen inset yields a
 // ~9:20 screen (1080×2400), matching current Pixel/Galaxy captures instead of
 // the iPhone mockup ratio it previously borrowed.
@@ -42,6 +44,10 @@ export const ANDROID_10L_SIZES = [{ label: '10" Landscape',  w: 2560, h: 1600 }]
 export const IPAD_SIZES = [
   { label: 'iPad Pro 12.9"', w: 2048, h: 2732 },
   { label: 'iPad Pro 11"',   w: 1668, h: 2224 },
+] as const
+export const IPAD_L_SIZES = [
+  { label: 'iPad Pro 12.9" Landscape', w: 2732, h: 2048 },
+  { label: 'iPad Pro 11" Landscape',   w: 2224, h: 1668 },
 ] as const
 export const FG_SIZES = [{ label: 'Feature Graphic', w: FGW, h: FGH }] as const
 
@@ -103,8 +109,9 @@ export function tabletPW2(cW: number, cH: number)              { return tabletPW
 export function tabletLW(cW: number, cH: number, clamp = 0.62) { return Math.min(clamp, 0.75 * (cH / cW) * TAB_L_RATIO) }
 export function ipadW(cW: number, cH: number, clamp = 0.75)    { return Math.min(clamp, 0.72 * (cH / cW) * IPAD_RATIO) }
 export function ipadW2(cW: number, cH: number)                 { return ipadW(cW, cH, 0.60) }
+export function ipadLW(cW: number, cH: number, clamp = 0.66)   { return Math.min(clamp, 0.72 * (cH / cW) * IPAD_L_RATIO) }
 
-export type DeviceFrame = 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad'
+export type DeviceFrame = 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad' | 'ipad-l'
 
 // Width-formula map per device frame. Used by SlideElement to resolve a
 // device element's widthRole ('primary'/'secondary') into a % of canvas.
@@ -120,6 +127,7 @@ export const DEVICE_WIDTH_FNS: Record<DeviceFrame, {
   'android-tablet-p': { primary: tabletPW, secondary: tabletPW2, ratio: TAB_P_RATIO },
   'android-tablet-l': { primary: tabletLW, secondary: tabletLW,  ratio: TAB_L_RATIO },
   'ipad':             { primary: ipadW,    secondary: ipadW2,    ratio: IPAD_RATIO },
+  'ipad-l':           { primary: ipadLW,   secondary: ipadLW,    ratio: IPAD_L_RATIO },
 }
 
 const PLACEHOLDER = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN88P/BHgAIggN/PzmliQAAAABJRU5ErkJggg=='

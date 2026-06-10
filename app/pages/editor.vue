@@ -357,13 +357,18 @@ async function onImportFile(e: Event) {
   input.value = ''
 }
 
+// The Android-tablet `<select>` (7"/10") is distinct from isTablet, which also
+// covers iPad now that iPad supports landscape. Keep this Android-only so the
+// select doesn't light up when iPad is the active device.
+const isAndroidTablet = computed(() => device.value === 'android-7' || device.value === 'android-10')
+
 // Device frame type mapping
 const deviceFrame = computed(() => {
   const d = device.value
   const o = orientation.value
   if (d === 'iphone') return 'iphone' as const
   if (d === 'android') return 'android-phone' as const
-  if (d === 'ipad') return 'ipad' as const
+  if (d === 'ipad') return o === 'landscape' ? 'ipad-l' as const : 'ipad' as const
   if (d === 'android-7' || d === 'android-10') {
     return o === 'landscape' ? 'android-tablet-l' as const : 'android-tablet-p' as const
   }
@@ -1016,9 +1021,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               {{ d.label }}
             </button>
             <select
-              :value="isTablet ? device : ''"
+              :value="isAndroidTablet ? device : ''"
               class="text-xs font-semibold border-none rounded-md px-2.5 py-1 cursor-pointer outline-none shrink-0"
-              :class="isTablet ? 'bg-white text-blue-600 shadow-sm' : 'bg-transparent text-gray-500'"
+              :class="isAndroidTablet ? 'bg-white text-blue-600 shadow-sm' : 'bg-transparent text-gray-500'"
               @change="(e: Event) => { const v = (e.target as HTMLSelectElement).value; if (v) { device = v as Device; sizeIdx = 0 } }"
             >
               <option

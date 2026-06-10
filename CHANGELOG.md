@@ -6,6 +6,12 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **iPad landscape mode**. Landscape was previously Android-tablet-only. Selecting
+  iPad in the editor now shows a Portrait ↕ / Landscape ↔ toggle, mirroring the
+  Android tablets. Landscape has its own screenshot upload slot, device frame, and
+  export sizes (iPad Pro 12.9" & 11" — 2732×2048 / 2224×1668). (#6)
+
 ## [0.11.0] — 2026-06-07
 
 ### Added

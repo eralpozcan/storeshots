@@ -9,7 +9,7 @@ const props = defineProps<{
   cW: number
   cH: number
   label: string
-  deviceFrame: 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad'
+  deviceFrame: 'iphone' | 'android-phone' | 'android-tablet-p' | 'android-tablet-l' | 'ipad' | 'ipad-l'
   // When true, render the transform overlay (device + caption drag handles)
   // above SlideTemplate. Used by the focused canvas mode.
   transformMode?: boolean
