@@ -23,6 +23,7 @@
   ],
   "type": "module",
   "scripts": {
+    "test": "node --test tests/*.test.cjs",
     "dev": "nuxt dev",
     "build": "nuxt build",
     "preview": "nuxt preview"

@@ -61,6 +61,7 @@ const { openSettings } = useCookieConsent()
         </div>
 
         <div class="flex items-center gap-2">
+          <UButton to="/editor-v2" variant="soft">V2 Beta</UButton>
           <UButton
             :to="GH_URL"
             target="_blank"
@@ -75,12 +76,13 @@ const { openSettings } = useCookieConsent()
             to="/editor"
             trailing-icon="i-lucide-arrow-right"
           >
-            Open Editor
+            Classic editor
           </UButton>
         </div>
       </nav>
     </header>
 
+    <p class="px-5 py-3 text-center text-sm leading-relaxed bg-blue-50 text-blue-800">V2 Beta is available alongside the classic editor. Your drafts stay separate in each editor.</p>
     <main>
       <slot />
     </main>

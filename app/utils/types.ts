@@ -115,6 +115,13 @@ export type BrandColors = {
 
 export type DeviceImages = (string | null)[]
 
+export type AppleArtwork = {
+  fit: 'contain' | 'cover'
+  x: number
+  y: number
+  background: string
+}
+
 // Uploaded custom font. dataUrl is a base64 font data-URL; format is the CSS
 // `format()` hint (woff2/woff/opentype/truetype).
 export type CustomFont = {
@@ -124,6 +131,8 @@ export type CustomFont = {
 }
 
 export type UserConfig = {
+  v2Workflow?: { outputs: string[]; prepared: boolean; includeClosing?: boolean; exportSizes?: Record<string, string[]>; sourceKey?: ImagesKey; linkedSlots?: Partial<Record<ImagesKey, number[]>> }
+  appleArtwork?: Partial<Record<ImagesKey, AppleArtwork>>
   appName: string
   appDescription: string
   // Free-form extra context/brief fed to the AI (audience, tone, keywords,
@@ -151,6 +160,12 @@ export type UserConfig = {
     androidTablet7L: DeviceImages
     androidTablet10P: DeviceImages
     androidTablet10L: DeviceImages
+    duoOuter: DeviceImages
+    duoOuterLandscape: DeviceImages
+    duoInner: DeviceImages
+    duoInnerLandscape: DeviceImages
+    appleHeader: DeviceImages
+    appleSearch: DeviceImages
   }
   locale: string
   selectedLocales: string[]
@@ -164,6 +179,10 @@ export type UserConfig = {
 }
 
 export type Device =
+  | 'iphone-duo-outer'
+  | 'iphone-duo-inner'
+  | 'apple-header'
+  | 'apple-search'
   | 'iphone'
   | 'android'
   | 'android-7'
@@ -176,6 +195,8 @@ export type Orientation = 'portrait' | 'landscape'
 export type ImagesKey = keyof UserConfig['images']
 
 export type SlideConfig = {
+  artwork?: AppleArtwork
+  fgElements?: SlideElement[]
   images: (string | null)[]
   copy: SlideCopy[]
   colors: BrandColors

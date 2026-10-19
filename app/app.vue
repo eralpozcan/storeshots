@@ -15,7 +15,7 @@ const route = useRoute()
 
 // Mobile warning only makes sense on the editor (small screens can't use the design surface).
 // Landing + legal pages are responsive and must remain visible on mobile.
-const showMobileWarning = computed(() => isMobile.value && route.path.startsWith('/editor'))
+const showMobileWarning = computed(() => isMobile.value && route.path === '/editor')
 
 onMounted(() => {
   currentUrl.value = window.location.hostname

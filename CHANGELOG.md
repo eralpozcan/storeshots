@@ -6,6 +6,31 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- V2 Beta alongside the classic editor, with separate drafts and explicit project-file transfer.
+- V2 image targets for iPhone Duo outer/inner displays in both orientations, App Store product page header (3840 × 1646), and search results (1920 × 1280), each with separate uploads.
+- Google Play Feature Graphic preview and download in V2.
+- V2 complete-set wizard: select outputs once, prepare the set, and download all selected device/store sizes and languages in a single ZIP.
+- Target-specific Fit/Fill, horizontal/vertical focus and background controls for Apple artwork, preserved in V2 drafts and project files.
+- V2 slide ordering across screenshot outputs and languages, separate screenshot selection for paired device frames, and one-step layout undo that preserves text edits.
+- V2 store listing preview, optional closing card, and per-output download sizes saved with each project.
+
+### Changed
+- V2 AI connection setup moved to a single settings dialog. Provider and model are remembered across projects; API keys remain in tab session storage. AI tools no longer repeat connection fields.
+- V2 leads with the prepared set and Download all. Templates, Colors and advanced tools appear only when Customize set is opened; individual cards reveal their editing controls on demand.
+- V2 mobile editing keeps a compact preview above independently scrolling controls; the editor and its browser title are labeled Beta.
+
+### Fixed
+- Project imports preserve the active AI provider, model, and key together in both editors. Invalid imports leave the current V2 editing view intact.
+- V2 source screenshot changes update linked adaptations while keeping custom output images independent. Output selections require applying before returning to the prepared set.
+- V2 languages can be selected directly for preview and manual editing; Header/Search artwork uploads stay in the output-selection step.
+- Classic editor single-image and Feature Graphic downloads now use Blob URLs, matching the working V2 download path.
+- V2 export filenames derive portrait/landscape from the actual output dimensions.
+- V2 AI headlines retain their screenshot associations and existing layouts, including sparse uploads and the tenth screenshot.
+- Malformed project names and AI model fields fall back to defaults when restoring projects or V2 drafts.
+- Restore older V2 drafts and project files with defaults for newly added image targets.
+- V2 single-image downloads no longer fetch a data URL blocked by the site's connection policy.
+
 ## [0.12.0] — 2026-07-28
 
 ### Added

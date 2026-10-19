@@ -1,6 +1,7 @@
 import type { UserConfig } from './types'
 import { DEFAULT_FONT_FAMILY } from './fonts'
 import { FG_PRESET } from './canvas'
+import { APPLE_IMAGE_KEYS } from './apple-assets'
 
 export const SLIDE_COUNT = 10
 export const SLIDE_COUNT_APPLE = 10
@@ -42,6 +43,12 @@ export const DEFAULT_CONFIG: UserConfig = {
     androidTablet7L: [...EMPTY_IMAGES],
     androidTablet10P: [...EMPTY_IMAGES],
     androidTablet10L: [...EMPTY_IMAGES],
+    duoOuter: [...EMPTY_IMAGES],
+    duoOuterLandscape: [...EMPTY_IMAGES],
+    duoInner: [...EMPTY_IMAGES],
+    duoInnerLandscape: [...EMPTY_IMAGES],
+    appleHeader: [null],
+    appleSearch: [null],
   },
   locale: 'en',
   selectedLocales: ['en'],
@@ -57,6 +64,59 @@ export const DEFAULT_CONFIG: UserConfig = {
 export const STORAGE_KEY = 'screenshot-generator-config'
 
 const AI_KEY_STORAGE = 'screenshot-generator-ai-key'
+
+export function restoreConfig(value: unknown, apiKey = ''): UserConfig {
+  const defaults: UserConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG))
+  const parsed = value && typeof value === 'object' ? value as Partial<UserConfig> : {}
+  const images = defaults.images
+  const appleArtwork: NonNullable<UserConfig['appleArtwork']> = {}
+  for (const key of APPLE_IMAGE_KEYS) {
+    const artwork = parsed.appleArtwork?.[key]
+    if (!artwork || typeof artwork !== 'object') continue
+    appleArtwork[key] = {
+      fit: artwork.fit === 'cover' ? 'cover' : 'contain',
+      x: typeof artwork.x === 'number' && Number.isFinite(artwork.x) ? Math.max(0, Math.min(100, artwork.x)) : 50,
+      y: typeof artwork.y === 'number' && Number.isFinite(artwork.y) ? Math.max(0, Math.min(100, artwork.y)) : 50,
+      background: typeof artwork.background === 'string' && /^#[0-9a-f]{6}$/i.test(artwork.background) ? artwork.background : defaults.colors.bgFrom,
+    }
+  }
+  for (const key of Object.keys(images) as (keyof typeof images)[]) {
+    const incoming = parsed.images?.[key]
+    images[key] = images[key].map((_, i) => typeof incoming?.[i] === 'string' ? incoming[i]! : null)
+  }
+  return {
+    ...defaults, ...parsed,
+    v2Workflow: parsed.v2Workflow && Array.isArray(parsed.v2Workflow.outputs)
+      ? { outputs: parsed.v2Workflow.outputs.filter(id => typeof id === 'string'), prepared: parsed.v2Workflow.prepared === true,
+          includeClosing: parsed.v2Workflow.includeClosing !== false,
+          exportSizes: Object.fromEntries(Object.entries(parsed.v2Workflow.exportSizes || {}).filter(([, sizes]) => Array.isArray(sizes)).map(([id, sizes]) => [id, (sizes as unknown[]).filter((size): size is string => typeof size === 'string' && /^\d+x\d+$/.test(size))])),
+          sourceKey: parsed.v2Workflow.sourceKey && Object.hasOwn(images, parsed.v2Workflow.sourceKey) ? parsed.v2Workflow.sourceKey : undefined,
+          linkedSlots: Object.fromEntries(Object.entries(parsed.v2Workflow.linkedSlots || {}).filter(([key, slots]) => Object.hasOwn(images, key) && Array.isArray(slots)).map(([key, slots]) => [key, (slots as number[]).filter(i => Number.isInteger(i) && i >= 0 && i < images[key as keyof typeof images].length)])),
+        }
+      : undefined,
+    appName: typeof parsed.appName === 'string' ? parsed.appName : defaults.appName,
+    colors: { ...defaults.colors, ...parsed.colors },
+    images,
+    appleArtwork,
+    ai: {
+      provider: parsed.ai?.provider === 'openrouter' ? 'openrouter' : 'claude',
+      claudeModel: typeof parsed.ai?.claudeModel === 'string' && parsed.ai.claudeModel.trim() ? parsed.ai.claudeModel : defaults.ai.claudeModel,
+      openrouterModel: typeof parsed.ai?.openrouterModel === 'string' && parsed.ai.openrouterModel.trim() ? parsed.ai.openrouterModel : defaults.ai.openrouterModel,
+      apiKey,
+    },
+    copy: Array.from({ length: SLIDE_COUNT }, (_, i) => {
+      const slide = parsed.copy?.[i]
+      return slide && typeof slide.headline === 'string' && typeof slide.label === 'string' ? slide : defaults.copy[i]!
+    }),
+    copyByLocale: parsed.copyByLocale && typeof parsed.copyByLocale === 'object' ? parsed.copyByLocale : {},
+    features: Array.isArray(parsed.features) ? parsed.features.filter(f => typeof f === 'string') : [],
+    locale: typeof parsed.locale === 'string' ? parsed.locale : defaults.locale,
+    selectedLocales: Array.isArray(parsed.selectedLocales) && parsed.selectedLocales.some(l => typeof l === 'string' && l)
+      ? parsed.selectedLocales.filter(l => typeof l === 'string' && l)
+      : [typeof parsed.locale === 'string' ? parsed.locale : defaults.locale],
+    fgElements: Array.isArray(parsed.fgElements) && parsed.fgElements.length ? parsed.fgElements : defaults.fgElements,
+  }
+}
 
 export function loadConfig(): UserConfig {
   if (import.meta.server) return DEFAULT_CONFIG

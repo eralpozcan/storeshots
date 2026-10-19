@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import { toPng, getFontEmbedCSS } from 'html-to-image'
+import { captureElement } from '~/utils/capture'
 import JSZip from 'jszip'
 import type { Device, Orientation, SlideElement, TextElement } from '~/utils/types'
 import {
@@ -426,66 +426,16 @@ function setRef(i: number, el: Element | ComponentPublicInstance | null) {
 // - pixelRatio: 1 so output matches the exact store pixel dimensions
 // - shorter wait (rAF + small timeout) once fonts.ready resolves
 // - try/finally guarantees the capture container is removed on error
-async function captureElement(el: HTMLElement, tw: number, th: number): Promise<string> {
-  if (typeof document !== 'undefined' && 'fonts' in document) {
-    try { await (document.fonts as any).ready } catch (e) { console.warn('Font loading failed, proceeding anyway:', e) }
-  }
 
-  let fontEmbedCSS: string | undefined
-  try { fontEmbedCSS = await getFontEmbedCSS(el) } catch (e) { console.warn('getFontEmbedCSS failed:', e) }
-
-  const clone = el.cloneNode(true) as HTMLElement
-  const container = document.createElement('div')
-  // Off-viewport but laid out — html-to-image needs real layout, but the user
-  // shouldn't see a giant flash of the export node during capture.
-  container.style.position = 'fixed'
-  container.style.left = '-100000px'
-  container.style.top = '0px'
-  container.style.width = `${tw}px`
-  container.style.height = `${th}px`
-  container.style.pointerEvents = 'none'
-  container.style.display = 'block'
-  container.style.overflow = 'visible'
-  container.setAttribute('aria-hidden', 'true')
-
-  clone.style.position = 'static'
-  clone.style.width = `${tw}px`
-  clone.style.height = `${th}px`
-  clone.style.visibility = 'visible'
-  clone.style.display = 'block'
-  clone.style.overflow = 'visible'
-
-  container.appendChild(clone)
-  document.body.appendChild(container)
-
-  await new Promise(r => requestAnimationFrame(() => r(null)))
-  await new Promise(r => setTimeout(r, 200))
-  container.offsetHeight
-  clone.offsetHeight
-
-  // pixelRatio MUST be 1: tw/th are already the exact pixel dimensions the
-  // store requires. A ratio of 2 doubles the output (e.g. 1320×2868 → 2640×5736),
-  // which App Store Connect rejects as the wrong size.
-  const opts = { width: tw, height: th, pixelRatio: 1, cacheBust: true, fontEmbedCSS }
-
-  try {
-    try { await toPng(clone, opts) } catch (e) { console.warn('First toPng attempt failed:', e) }
-    try {
-      return await toPng(clone, opts)
-    } catch (e) {
-      console.error('toPng failed, falling back to container capture:', e)
-      return await toPng(container, opts)
-    }
-  } finally {
-    document.body.removeChild(container)
-  }
-}
-
-function downloadPng(url: string, name: string) {
+async function downloadPng(url: string, name: string) {
+  const zip = new JSZip()
+  zip.file(name, url.split(',')[1]!, { base64: true })
+  const blobUrl = URL.createObjectURL(await zip.file(name)!.async('blob'))
   const a = document.createElement('a')
   a.download = name
-  a.href = url
+  a.href = blobUrl
   a.click()
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
 }
 
 function fname(i: number) {
@@ -500,14 +450,14 @@ async function exportOne(i: number) {
   if (!el) return
   const s = sizePick.value
   exporting.value = `${i + 1}/${slideVariants.value.length}`
-  try { downloadPng(await captureElement(el, s.w, s.h), fname(i)) }
+  try { await downloadPng(await captureElement(el, s.w, s.h), fname(i)) }
   finally { exporting.value = null }
 }
 
 async function exportFG() {
   if (!fgRef.value) return
   exporting.value = 'FG'
-  try { downloadPng(await captureElement(fgRef.value, FGW, FGH), `feature-graphic-${FGW}x${FGH}.png`) }
+  try { await downloadPng(await captureElement(fgRef.value, FGW, FGH), `feature-graphic-${FGW}x${FGH}.png`) }
   finally { exporting.value = null }
 }
 
@@ -867,6 +817,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     <div class="flex-1 flex flex-col overflow-hidden relative">
       <!-- Toolbar — two rows: actions on top, device controls below. -->
       <div class="shrink-0 bg-white border-b border-gray-200 z-50">
+        <p class="px-4 py-2 text-xs leading-relaxed bg-blue-50 text-blue-800">Classic editor (V1) and V2 Beta remain available side by side. Drafts are separate; save a project here and open a copy in V2 to try the new editor.</p>
         <!-- Row 1: identity + project actions. Wraps so every action stays
              visible on narrow widths instead of being clipped off the edge. -->
         <div class="flex flex-wrap items-center justify-between gap-y-2 px-4 py-2 border-b border-gray-100">
@@ -888,6 +839,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             </span>
           </div>
           <div class="flex flex-wrap items-center justify-end gap-2 ml-auto">
+            <UButton to="/editor-v2" variant="soft" size="sm">V2 Beta</UButton>
             <UButton
               color="neutral"
               variant="ghost"

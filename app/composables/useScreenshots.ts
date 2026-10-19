@@ -1,5 +1,7 @@
 import type { UserConfig, Device, Orientation, SlideConfig } from '~/utils/types'
-import { loadConfig, saveConfig, DEFAULT_CONFIG } from '~/utils/defaults'
+import { copyForScreenshots } from '~/utils/editor-v2'
+import { loadConfig, saveConfig, DEFAULT_CONFIG, restoreConfig } from '~/utils/defaults'
+import { appleAssetSpec } from '~/utils/apple-assets'
 import { extractPalette } from '~/utils/color-extract'
 import { resolveFontStack } from '~/utils/fonts'
 import { sanitizeForGallery, slugify, type GalleryTemplate } from '~/utils/gallery'
@@ -38,8 +40,8 @@ async function downscaleDataUrl(dataUrl: string, maxDim = 1024, quality = 0.72):
   }
 }
 
-export function useScreenshots() {
-  const config = ref<UserConfig>(loadConfig())
+export function useScreenshots(persistence = { load: loadConfig, save: saveConfig }) {
+  const config = ref<UserConfig>(persistence.load())
   const device = ref<Device>('iphone')
   const orientation = ref<Orientation>('portrait')
   const sizeIdx = ref(0)
@@ -76,7 +78,7 @@ export function useScreenshots() {
       next.copyByLocale = { ...next.copyByLocale, [next.locale]: denseCopy }
     }
     config.value = next
-    saveConfig(config.value)
+    persistence.save(config.value)
   }
 
   // Switch the editor to a different language. Persists the current live copy
@@ -220,6 +222,8 @@ export function useScreenshots() {
   const canvasDims = computed(() => {
     const d = device.value
     const o = orientation.value
+    const asset = appleAssetSpec(d, o)
+    if (asset) return { cW: asset.w, cH: asset.h, sizes: [{ label: asset.label, w: asset.w, h: asset.h }] }
     if (d === 'feature-graphic') return { cW: FGW, cH: FGH, sizes: FG_SIZES as readonly { label: string; w: number; h: number }[] }
     if (d === 'iphone')   return { cW: W, cH: H, sizes: IPHONE_SIZES as readonly { label: string; w: number; h: number }[] }
     if (d === 'android')  return { cW: AW, cH: AH, sizes: ANDROID_SIZES as readonly { label: string; w: number; h: number }[] }
@@ -238,6 +242,7 @@ export function useScreenshots() {
     const c = config.value
     const d = device.value
     const o = orientation.value
+    const asset = appleAssetSpec(d, o)
     const imageMap: Record<string, (string | null)[]> = {
       iphone: c.images.iphone,
       android: c.images.androidPhone,
@@ -247,7 +252,9 @@ export function useScreenshots() {
       'feature-graphic': c.images.iphone,
     }
     return {
-      images: imageMap[d] ?? c.images.iphone,
+      images: asset ? c.images[asset.imageKey] : imageMap[d] ?? c.images.iphone,
+      artwork: asset ? c.appleArtwork?.[asset.imageKey] : undefined,
+      fgElements: c.fgElements,
       copy: c.copy,
       colors: c.colors,
       appIcon: c.appIcon,
@@ -264,8 +271,8 @@ export function useScreenshots() {
 
   // Collect uploaded images as base64 for AI vision analysis, downscaled to
   // keep the request body under the hosting proxy's size limit (avoids 413).
-  async function getUploadedImages(): Promise<string[]> {
-    const full = config.value.images.iphone.filter((img): img is string => !!img)
+  async function getUploadedImages(source = config.value.images.iphone): Promise<string[]> {
+    const full = source.filter((img): img is string => !!img)
     return Promise.all(full.map(img => downscaleDataUrl(img)))
   }
 
@@ -302,7 +309,7 @@ export function useScreenshots() {
     return reordered
   }
 
-  function applyAIResult(res: { slides?: any[]; colors?: any; features?: any[] }) {
+  function applyAIResult(res: { slides?: any[]; colors?: any; features?: any[] }, source?: (string | null)[]) {
     const patch: Partial<UserConfig> = {}
 
     // AI-suggested feature chips (full-design mode). Sanitize + cap; the user
@@ -317,11 +324,12 @@ export function useScreenshots() {
 
     if (res.slides) {
       // Extract copy (without imageIndex)
-      patch.copy = res.slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
+      patch.copy = source ? copyForScreenshots(config.value.copy, res.slides, source)
+        : res.slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
 
       // Reorder images if AI provided imageIndex
       const hasReorder = res.slides.some((s: any) => s.imageIndex !== undefined && s.imageIndex !== null)
-      if (hasReorder) {
+      if (hasReorder && !source) {
         const currentImages = { ...config.value.images }
         const originalIphone = [...currentImages.iphone]
         currentImages.iphone = reorderImages(res.slides, originalIphone)
@@ -357,7 +365,8 @@ export function useScreenshots() {
     console.error(prefix, e)
   }
 
-  async function generateCopy() {
+  async function generateCopy(sourceOrEvent?: (string | null)[] | Event) {
+    const source = Array.isArray(sourceOrEvent) ? sourceOrEvent : undefined
     if (!config.value.ai.apiKey) {
       toast.add({
         title: 'API key missing',
@@ -371,12 +380,12 @@ export function useScreenshots() {
     // one is editable via the editor's language tabs. Single language falls
     // through to the regular active-locale generation below.
     if ((config.value.selectedLocales?.length ?? 1) > 1) {
-      await generateLocales()
+      await generateLocales({ source })
       return
     }
     generating.value = true
     try {
-      const images = await getUploadedImages()
+      const images = await getUploadedImages(source)
       const res = await $fetch('/api/generate-copy', {
         method: 'POST',
         body: {
@@ -394,7 +403,7 @@ export function useScreenshots() {
           images,
         },
       }) as { slides?: any[]; error?: string }
-      applyAIResult(res)
+      applyAIResult(res, source)
     } catch (e: any) {
       showAIError('AI copy generation failed', e)
     } finally {
@@ -402,7 +411,8 @@ export function useScreenshots() {
     }
   }
 
-  async function generateFullDesign() {
+  async function generateFullDesign(sourceOrEvent?: (string | null)[] | Event) {
+    const source = Array.isArray(sourceOrEvent) ? sourceOrEvent : undefined
     if (!config.value.ai.apiKey) {
       toast.add({
         title: 'API key missing',
@@ -410,11 +420,11 @@ export function useScreenshots() {
         color: 'warning',
         icon: 'i-lucide-key',
       })
-      return
+      return false
     }
     generating.value = true
     try {
-      const images = await getUploadedImages()
+      const images = await getUploadedImages(source)
       const res = await $fetch('/api/generate-copy', {
         method: 'POST',
         body: {
@@ -432,9 +442,10 @@ export function useScreenshots() {
           images,
         },
       }) as { slides?: any[]; colors?: any; error?: string }
-      applyAIResult(res)
+      applyAIResult(res, source)
     } catch (e: any) {
       showAIError('AI design generation failed', e)
+      return false
     } finally {
       generating.value = false
     }
@@ -442,15 +453,16 @@ export function useScreenshots() {
     // When multiple languages are selected, translate the remaining ones too
     // (copy only — colors are language-independent), filling the editor tabs.
     if ((config.value.selectedLocales?.length ?? 1) > 1) {
-      await generateLocales({ onlyMissing: true })
+      await generateLocales({ onlyMissing: true, source })
     }
+    return true
   }
 
   // Generate copy for every selected language and persist each into
   // copyByLocale so the editor language tabs can review/edit them. Unlike the
   // export-time generation, this keeps the results in state rather than
   // discarding them after a one-shot ZIP.
-  async function generateLocales(opts?: { onlyMissing?: boolean }) {
+  async function generateLocales(opts?: { onlyMissing?: boolean; source?: (string | null)[] }) {
     if (!config.value.ai.apiKey) {
       toast.add({
         title: 'API key missing',
@@ -470,7 +482,7 @@ export function useScreenshots() {
     if (!locales.length) return
     generating.value = true
     try {
-      const images = await getUploadedImages()
+      const images = await getUploadedImages(opts?.source)
       const baseBody = {
         provider: config.value.ai.provider,
         apiKey: config.value.ai.apiKey,
@@ -491,7 +503,7 @@ export function useScreenshots() {
         }) as { locales?: Record<string, any[]> }
         for (const loc of locales) {
           const slides = res.locales?.[loc]
-          if (slides?.length) map[loc] = slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
+          if (slides?.length) map[loc] = opts?.source ? copyForScreenshots(config.value.copy, slides, opts.source) : slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
         }
       }
       else {
@@ -500,7 +512,7 @@ export function useScreenshots() {
             method: 'POST',
             body: { ...baseBody, locale: loc },
           }) as { slides?: any[] }
-          if (res.slides?.length) map[loc] = res.slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
+          if (res.slides?.length) map[loc] = opts?.source ? copyForScreenshots(config.value.copy, res.slides, opts.source) : res.slides.map((s: any) => ({ label: s.label || '', headline: s.headline || '' }))
         }
       }
       const active = config.value.locale
@@ -716,7 +728,7 @@ export function useScreenshots() {
   }
 
   async function importProject(file: File) {
-    if (import.meta.server) return
+    if (import.meta.server) return false
     if (file.size > 50 * 1024 * 1024) {
       toast.add({
         title: 'File too large',
@@ -724,7 +736,7 @@ export function useScreenshots() {
         color: 'error',
         icon: 'i-lucide-triangle-alert',
       })
-      return
+      return false
     }
     try {
       const text = await file.text()
@@ -737,29 +749,18 @@ export function useScreenshots() {
       }
       const incoming = parsed.config || {}
       // Merge over defaults so missing fields fall back rather than blowing up.
-      // Preserve the in-memory API key — imported files don't carry credentials.
-      const currentKey = config.value.ai.apiKey
-      config.value = {
-        ...DEFAULT_CONFIG,
-        ...incoming,
-        colors: { ...DEFAULT_CONFIG.colors, ...(incoming.colors || {}) },
-        images: { ...DEFAULT_CONFIG.images, ...(incoming.images || {}) },
-        ai: { ...DEFAULT_CONFIG.ai, ...(incoming.ai || {}), apiKey: currentKey },
-        copy: Array.isArray(incoming.copy) && incoming.copy.length ? incoming.copy : DEFAULT_CONFIG.copy,
-        copyByLocale: (incoming.copyByLocale && typeof incoming.copyByLocale === 'object') ? incoming.copyByLocale : {},
-        features: Array.isArray(incoming.features) ? incoming.features : DEFAULT_CONFIG.features,
-        locale: typeof incoming.locale === 'string' ? incoming.locale : DEFAULT_CONFIG.locale,
-        fgElements: Array.isArray(incoming.fgElements) && incoming.fgElements.length
-          ? incoming.fgElements
-          : DEFAULT_CONFIG.fgElements,
-      }
-      saveConfig(config.value)
+      // Keep credentials together with their provider/model connection. Project
+      // preferences must never attach an existing key to a different provider.
+      const ai = { ...config.value.ai }
+      config.value = { ...restoreConfig(incoming), ai }
+      persistence.save(config.value)
       toast.add({
         title: 'Project imported',
         description: `${file.name} loaded successfully.`,
         color: 'success',
         icon: 'i-lucide-upload',
       })
+      return true
     }
     catch (e: any) {
       toast.add({
@@ -769,6 +770,7 @@ export function useScreenshots() {
         icon: 'i-lucide-triangle-alert',
         duration: 6000,
       })
+      return false
     }
   }
 

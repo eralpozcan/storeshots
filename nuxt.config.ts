@@ -107,7 +107,7 @@ export default defineNuxtConfig({
   },
   sitemap: {
     enabled: true,
-    exclude: ['/editor'],
+    exclude: ['/editor', '/editor-v2'],
     urls: [
       { loc: '/', changefreq: 'weekly', priority: 1.0, lastmod: new Date().toISOString() },
       { loc: '/privacy', changefreq: 'yearly', priority: 0.3 },

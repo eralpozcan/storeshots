@@ -20,6 +20,18 @@ See the full [`CHANGELOG.md`](CHANGELOG.md) or the [`/changelog` page](https://s
 
 ## Features
 
+### V1 and V2 during the transition
+
+The classic editor (`/editor`) and **V2 Beta** (`/editor-v2`) remain available side by side. Each keeps a separate draft. Save a project file in one editor and open a copy in the other to transfer your work; there is no automatic migration. V1 remains available for advanced workflows that V2 does not yet cover.
+
+V2 follows **Screenshots → Outputs → Your set**. Reorder slides across screenshot outputs and languages, choose separate images for paired device frames, and undo layout changes without losing text edits. Use **Store preview** to review the leading images, then **Download options** to include or omit the closing card and choose output sizes. All sizes are selected by default.
+
+In V2, configure your provider, API key and model through **AI settings** once, then use the AI tools without repeating setup. Provider/model preferences stay in this browser across projects; your key stays only for the current tab session. Imported projects preserve your active AI connection. Saving settings does not send a provider request.
+
+V2 supports iPhone Duo outer and inner screenshots in portrait and landscape, plus App Store product page header (3840 × 1646) and search artwork (1920 × 1280). These targets keep separate uploads. Apple artwork defaults to Fit without cropping; choose Fill and adjust the focal point to cover the canvas. Placement and background are saved separately for each target and orientation. Duo exports use the actual screen ratio without a simulated hardware frame. Check final placement with App Store Connect's preview tool. Video and automatic App Store uploads are not included.
+
+Design changes use the installed [UI UX Pro Max skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill), with Nuxt UI guidance and responsive previews.
+
 ### Editor
 - **Guided 5-step wizard sidebar** — Basics · Screenshots · AI · Headlines · Style. Single-open accordion with step-completion hints so a new user always knows what to do next.
 - **Quick-start templates** — Pre-filled tone of voice for SaaS / Game / Finance / Health, and each seeds the AI brief with an audience/tone hint for its vertical. Auto-opens on a fresh editor; never overwrites the user's icon, screenshots, or AI key.

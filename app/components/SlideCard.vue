@@ -13,6 +13,8 @@ const props = defineProps<{
   // When true, render the transform overlay (device + caption drag handles)
   // above SlideTemplate. Used by the focused canvas mode.
   transformMode?: boolean
+  hideActions?: boolean
+  assetKind?: 'duo' | 'creative' | 'feature-graphic'
 }>()
 
 // Resolve the slide's element list once — shared between SlideTemplate
@@ -28,7 +30,7 @@ const elements = computed<SlideElement[]>(() => {
 // True when this slide has a screenshot uploaded for the current device.
 // The trust slide (variant 10) is intentionally text-only, so it always
 // counts as "has content" — only screenshot slides surface the empty state.
-const hasContent = computed(() => props.variant === 10 || !!props.cfg.images[props.index])
+const hasContent = computed(() => props.assetKind === 'feature-graphic' || (!props.assetKind && props.variant === 10) || !!props.cfg.images[props.index])
 
 const emit = defineEmits<{
   export: []
@@ -71,7 +73,10 @@ onUnmounted(() => ro?.disconnect())
           pointerEvents: transformMode ? undefined : 'none'
         }"
       >
+        <AppleAsset v-if="assetKind === 'duo' || assetKind === 'creative'" :cfg="cfg" :index="index" :c-w="cW" :c-h="cH" :kind="assetKind" />
+        <FeatureGraphic v-else-if="assetKind === 'feature-graphic'" :cfg="cfg" :elements="cfg.fgElements" />
         <SlideTemplate
+          v-else
           :variant="variant"
           :cfg="cfg"
           :c-w="cW"
@@ -79,7 +84,7 @@ onUnmounted(() => ro?.disconnect())
           :device-frame="deviceFrame"
         />
         <SlideTransformOverlay
-          v-if="transformMode"
+          v-if="transformMode && !assetKind"
           :elements="elements"
           :c-w="cW"
           :c-h="cH"
@@ -106,7 +111,7 @@ onUnmounted(() => ro?.disconnect())
       <!-- Hover overlay actions. Hidden in transform mode — the focused
            header is the single source of edit controls there. -->
       <button
-        v-if="!transformMode"
+        v-if="!transformMode && !hideActions"
         type="button"
         class="absolute top-2 left-2 size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
         title="Edit copy"
@@ -119,7 +124,7 @@ onUnmounted(() => ro?.disconnect())
         />
       </button>
       <button
-        v-if="!transformMode"
+        v-if="!transformMode && !hideActions"
         type="button"
         class="absolute top-2 left-12 size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
         title="Edit layout — drag device frame and caption to reposition"
@@ -132,10 +137,10 @@ onUnmounted(() => ro?.disconnect())
         />
       </button>
       <button
-        v-if="!transformMode"
+        v-if="!transformMode && !hideActions"
         type="button"
         class="absolute top-2 right-2 size-8 rounded-full bg-white/90 backdrop-blur shadow-md text-gray-700 hover:text-blue-600 hover:bg-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity flex items-center justify-center z-10"
-        title="Download this slide as PNG"
+        :title="assetKind === 'duo' || assetKind === 'creative' ? 'Download this image as JPEG' : 'Download this slide as PNG'"
         aria-label="Download slide"
         @click.stop="emit('export')"
       >
